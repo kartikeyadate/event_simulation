@@ -248,7 +248,8 @@ class Cockroach:
 ######## CLASSES FOR SEARCH ####################################################
 ################################################################################
 ################################################################################
-
+### This implementation draws on Amit Patel's description of A* at 
+#### http://theory.stanford.edu/~amitp/GameProgramming/
 
 class PriorityQueue:
     """A wrapper class around python's heapq class. 
@@ -301,6 +302,7 @@ class Search:
             return 1.4142 * abs(y2 - y1) + 1.0 *abs((abs(y2 - y1) - abs(x2 - x1)))
         elif abs(y2 - y1) == abs (x2 - x1):
             return 1.4142 * abs(y2 - y1)
+
 
     def get_path(self):
         self.open_cells.put(self.start, 0)

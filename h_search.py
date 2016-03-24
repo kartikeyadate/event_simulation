@@ -9,7 +9,7 @@ from eventsim_classes import *
 
 def run():
     pygame.init()
-    w, h, s = 1400, 800, 10
+    w, h, s = 1400, 350, 10
 #    w, h, s = 1100, 600, 10
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
@@ -17,7 +17,7 @@ def run():
     create_space(w, h, s) #Create a dictionary of all cells.
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
-    threshold_graph = create_zones(w, h, s, zone_size = 13) #Create zones, thresholds, walls search graphs
+    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 15) #Create zones, thresholds, walls search graphs
     poison_threshold = 20
     create_actors(50, poison_threshold)
     infested_zones = choose_zones_to_infest(3)
@@ -201,7 +201,7 @@ def search(actor_a, actor_b, threshold_graph, screen):
                     search_graph[g] = Cell.C[s].neighbours()
                 s_internal = Search(s, g, graph = search_graph, threshold = poison_threshold)
                 if s_internal.path is not None and len(s_internal.path) > 1:
-                    s_internal.draw_route(screen, color = midnightblue)
+                    s_internal.draw_route(screen, color = white)
                     actor_a.move(s_internal.path[1])
                     s_internal.path.pop(0)
                 elif s_internal.path is None:
@@ -219,7 +219,7 @@ def search(actor_a, actor_b, threshold_graph, screen):
             search_graph[g] = Cell.C[s].neighbours()
         s_internal = Search(s, g, search_graph, threshold = poison_threshold)
         if s_internal.path is not None and len(s_internal.path) > 1:
-            s_internal.draw_route(screen, color = midnightblue)
+            s_internal.draw_route(screen, color = white)
             actor_a.move(s_internal.path[1])
             s_internal.path.pop(0)
         elif s_internal.path is None:
