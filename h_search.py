@@ -9,23 +9,23 @@ from eventsim_classes import *
 
 def run():
     pygame.init()
-    w, h, s = 1400, 350, 10
+    w, h, s = 1500, 800, 10
 #    w, h, s = 1100, 600, 10
     clock = pygame.time.Clock()  # create a clock object
-    FPS = 5  # set frame rate in frames per second.
+    FPS = 2  # set frame rate in frames per second.
     screen = pygame.display.set_mode((w, h))  # create screen
     create_space(w, h, s) #Create a dictionary of all cells.
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
     threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 15) #Create zones, thresholds, walls search graphs
-    poison_threshold = 20
-    create_actors(50, poison_threshold)
+    poison_threshold = 50
+    create_actors(100, poison_threshold)
     infested_zones = choose_zones_to_infest(3)
     for zone in infested_zones:
-        make_roaches(25, 3, 15, tomato, z = zone)
-        make_roaches(8, 5, -40, lightgrey, z = zone)
-    make_roaches(350, 3, 20, tomato)  # 1 DataMap        
-    make_roaches(75, 5, -50, lightgrey)  # 3 DataMap
+        make_roaches(25, 3, 20, tomato, z = zone)
+        make_roaches(5, 5, -40, lightgrey, z = zone)
+    make_roaches(350, 3, 25, tomato)  # 1 DataMap        
+    make_roaches(50, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
     tf = 0
     while True:
@@ -38,8 +38,7 @@ def run():
         draw_actors(screen)
 #        conduct_searches(threshold_graph, screen)        
 #        if tf > 100 and tf % 2:
-        if tf > 50:        
-            conduct_searches(threshold_graph, screen)
+        conduct_searches(threshold_graph, screen)
         manage_events(screen, threshold_graph)
         pygame.display.update()
         if tf % 100 == 0:
@@ -72,20 +71,16 @@ def create_space(w, h, s):
     for i in range(int(w/s)):
         for j in range(int(h/s)):
             Cell(i, j, s)
-#zone_size - how many cells in a zone
+
 def create_zones(w, h, s, top_left = (3, 3), zone_size = 20):
     ID = 0
-    #number of equal zones possible in a given space and a given zone size
     number_of_zones = len(range(top_left[0], int(w/s) - zone_size, zone_size))*len(range(top_left[1], int(h/s) - zone_size, zone_size))
     print("Total number of zones: ", number_of_zones)
     for i in range(top_left[0], int(w/s) - zone_size, zone_size):
         for j in range(top_left[1], int(h/s) - zone_size, zone_size):
             zone = Zone(str(ID))
-            #i is the x coordinate of the top left cell of the zone, actual visualized zone size is smaller in one
-            # unit then zone_size that is why end of range is minus 1. this builds the wall between zones
             for x in range(i, i + zone_size - 1):
                 for y in range(j, j + zone_size - 1):
-                    #the value of the dictionary is the instance itself! the cell with x,y coordinates that we want
                     Cell.C[(x, y)].in_zone = True
                     #Add zone ID to the cells belonging to zones.
                     Cell.C[(x, y)].zones.add(str(ID))
@@ -95,19 +90,15 @@ def create_zones(w, h, s, top_left = (3, 3), zone_size = 20):
             zone.make_search_graph()
             print("Created Zone ", str(ID))
             ID += 1
-#check for duplicates
+
     for c in Cell.T:
         Cell.T[c] = list(set(Cell.T[c]))
     
     threshold_graph = defaultdict(list)    
     for t in Cell.T:
         for zone in Cell.T[t]:
-            #.thresholds contains lists of cells which are the borders of the th zone
             for th in Zone.Z[zone].thresholds:
-                #for each list of cells take only the threshold, meaning cells which are not walls,
-                # this is because when we defined .thresholds we did not know if a cell is a wall
-                nb = [i for i in th if not Cell.C[i].is_barrier]
-                #all the neighbooring threshold cells which are not in the same threshold
+                nb = [i for i in th if not Cell.C[i].is_barrier]                
                 if t not in nb:
                     threshold_graph[t] += nb
 
@@ -130,10 +121,13 @@ def move_actors(infested_zones):
                 Actor.A[a].initialize_in_zone(random.choice(clean_zones))
 
 def reset_actors():
+    Actor.reset_meeting_status()
     zones = [i for i in Zone.Z.keys()]
     for a in Actor.A:
+        choices = 0, 1
         x, y = Actor.A[a].x, Actor.A[a].y
-        Actor.A[a].initialize_in_zone(random.choice(zones))
+        if random.choice(choices) == 1:
+            Actor.A[a].initialize_in_zone(random.choice(zones))
 
 
 def choose_zones_to_infest(n):
@@ -191,7 +185,7 @@ def search(actor_a, actor_b, threshold_graph, screen):
         S = Search((ax, ay), (bx, by), graph = threshold_graph, threshold = poison_threshold)
         if S.path is not None:
             if len(S.path) > 1:
-                S.draw_route(screen, color = verylightgrey)
+                S.draw_route(screen, color = lightgrey)
                 s, g = S.path[:2]
                 z = get_search_zone(s, g)            
                 search_graph = Zone.Z[z].graph
@@ -201,14 +195,15 @@ def search(actor_a, actor_b, threshold_graph, screen):
                     search_graph[g] = Cell.C[s].neighbours()
                 s_internal = Search(s, g, graph = search_graph, threshold = poison_threshold)
                 if s_internal.path is not None and len(s_internal.path) > 1:
-                    s_internal.draw_route(screen, color = white)
+                    s_internal.draw_route(screen, color = midnightblue)
                     actor_a.move(s_internal.path[1])
                     s_internal.path.pop(0)
-                elif s_internal.path is None:
-                    print("No path found. Waiting for things to improve..")                
-        elif S.path is None:
-            print("No threshold available. Waiting for things to improve... ")
-                
+#                elif s_internal.path is None:
+#                    print("No path found. Waiting for things to improve..")                
+
+#        elif S.path is None:
+#            print("No threshold available. Waiting for things to improve... ")
+
     elif Cell.C[(ax, ay)].zones == Cell.C[(bx, by)].zones:
         z = get_search_zone((ax, ay),(bx, by))
         s, g = (ax, ay), (bx, by)
@@ -219,11 +214,11 @@ def search(actor_a, actor_b, threshold_graph, screen):
             search_graph[g] = Cell.C[s].neighbours()
         s_internal = Search(s, g, search_graph, threshold = poison_threshold)
         if s_internal.path is not None and len(s_internal.path) > 1:
-            s_internal.draw_route(screen, color = white)
+            s_internal.draw_route(screen, color = midnightblue)
             actor_a.move(s_internal.path[1])
             s_internal.path.pop(0)
-        elif s_internal.path is None:
-            print("No path found. Waiting for things to improve..")                
+#        elif s_internal.path is None:
+#            print("No path found. Waiting for things to improve..")                
         
  
 def get_search_zone(c1, c2):
@@ -245,6 +240,7 @@ def conduct_searches(threshold_graph, screen):
     """
     for i in range(0, actors, 2):
         if str(i) in Actor.A.keys() and str(i+1) in Actor.A.keys():
+            Actor.check_meeting()
             search(Actor.A[str(i)], Actor.A[str(i+1)], threshold_graph, screen)        
 
 ############ DRAWING FUNCTIONS #################################################
