@@ -7,24 +7,31 @@ from colors import *
 from eventsim_classes import *
 
 
+def run_events():
+    for i in range(10):
+        e = Event(str(i))
+    for e in Event.E:
+        Event.E[e].update_state()
+        Event.E[e].show_state()
+
 def run():
     pygame.init()
-    w, h, s = 1500, 800, 10
+    w, h, s = 640, 640, 8
 #    w, h, s = 1100, 600, 10
     clock = pygame.time.Clock()  # create a clock object
-    FPS = 2  # set frame rate in frames per second.
+    FPS = 5  # set frame rate in frames per second.
     screen = pygame.display.set_mode((w, h))  # create screen
     create_space(w, h, s) #Create a dictionary of all cells.
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
     threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 15) #Create zones, thresholds, walls search graphs
-    poison_threshold = 50
+    poison_threshold = 25
     create_actors(100, poison_threshold)
     infested_zones = choose_zones_to_infest(3)
     for zone in infested_zones:
-        make_roaches(25, 3, 20, tomato, z = zone)
+        make_roaches(20, 3, 20, tomato, z = zone)
         make_roaches(5, 5, -40, lightgrey, z = zone)
-    make_roaches(350, 3, 25, tomato)  # 1 DataMap        
+    make_roaches(150, 3, 25, tomato)  # 1 DataMap        
     make_roaches(50, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
     tf = 0
@@ -42,7 +49,7 @@ def run():
         manage_events(screen, threshold_graph)
         pygame.display.update()
         if tf % 100 == 0:
-            print(1.0/(time.clock() - start), "fps")
+            print(round(1.0/(time.clock() - start),3), "fps")
         clock.tick(FPS)
         
 def manage_events(screen, graph):
@@ -124,10 +131,7 @@ def reset_actors():
     Actor.reset_meeting_status()
     zones = [i for i in Zone.Z.keys()]
     for a in Actor.A:
-        choices = 0, 1
-        x, y = Actor.A[a].x, Actor.A[a].y
-        if random.choice(choices) == 1:
-            Actor.A[a].initialize_in_zone(random.choice(zones))
+        Actor.A[a].initialize_in_zone(random.choice(zones))
 
 
 def choose_zones_to_infest(n):
@@ -164,7 +168,8 @@ def make_roaches(n, r, p, c, z = None):
 
 def move_roaches():
     for r in Cockroach.Roaches:
-        r.move_cockroach()
+#        r.move_cockroach_intelligently()
+        r.move_cockroach_randomly()
 
 
 ################################################################################
@@ -234,14 +239,26 @@ def get_search_zone(c1, c2):
 def conduct_searches(threshold_graph, screen):
     actors = len(Actor.A)
     """
+    Actor.check_meeting()
     search(Actor.A['0'], Actor.A['1'], threshold_graph, screen)
     search(Actor.A['2'], Actor.A['0'], threshold_graph, screen)
     search(Actor.A['1'], Actor.A['3'], threshold_graph, screen)            
+    search(Actor.A['4'], Actor.A['2'], threshold_graph, screen)            
+    search(Actor.A['6'], Actor.A['5'], threshold_graph, screen)
+    search(Actor.A['3'], Actor.A['4'], threshold_graph, screen)                                            
     """
+#    """
     for i in range(0, actors, 2):
         if str(i) in Actor.A.keys() and str(i+1) in Actor.A.keys():
             Actor.check_meeting()
             search(Actor.A[str(i)], Actor.A[str(i+1)], threshold_graph, screen)        
+#    """
+    """
+    for i in range(0, actors):
+        if str(i) in Actor.A.keys():
+            Actor.check_meeting()
+            search(Actor.A[str(i)], Actor.A['0'], threshold_graph, screen)        
+    """
 
 ############ DRAWING FUNCTIONS #################################################
 
@@ -261,4 +278,5 @@ def draw_poison(screen, color, threshold, drawing_type = None):
 
 if __name__ == "__main__":
     run()
+#    run_events()
 

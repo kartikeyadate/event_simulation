@@ -159,10 +159,13 @@ class Zone:
 
 class Actor:
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, speed = 1.0):
         self.name = name
         self.x = x
         self.y = y
+        self.xpos = x
+        self.ypos = y
+        self.speed = speed
         self. threshold = threshold
         if zone is not None:
             self.initialize_in_zone(zone)
@@ -246,8 +249,36 @@ class Cockroach:
         radius = Cell.size // 2
         pygame.draw.circle(screen, self.color, center, radius)
 
-    def move_cockroach(self):
-        options = -1, 0, 1
+    def move_cockroach_intelligently(self):
+        """The cleaner cockroaches do not perform random walks. Instead they move to the worst infested cell."""
+        if self.poison > 0:
+            options = -1, 0, 1        
+            x = random.choice(options)
+            y = random.choice(options)
+            old_x, old_y = self.x, self.y
+            new_x, new_y = self.x + x, self.y + y
+            if (new_x, new_y) in Cell.C.keys() and not Cell.C[(new_x, new_y)].is_barrier:
+                Cockroach.Poison[(old_x, old_y)] -= (self.poison - 1)
+                if Cockroach.Poison[(old_x, old_y)] < 0:
+                    Cockroach.Poison[(old_x, old_y)] = 0
+                self.x, self.y = new_x, new_y
+                Cockroach.Poison[(new_x, new_y)] += self.poison
+                if Cockroach.Poison[(new_x, new_y)] < 0:
+                    Cockroach.Poison[(new_x, new_y)] = 0
+                    
+        elif self.poison <= 0:
+            target = [(Cockroach.Poison[i],i) for i in Cell.C[(self.x, self.y)].nbrs if not Cell.C[(self.x, self.y)].is_barrier]
+            target = random.choice([i for i in target if i == max(target)])
+            self.x, self.y = target[1][0], target[1][1]
+            Cockroach.Poison[(self.x, self.y)] += self.poison
+            if Cockroach.Poison[(self.x, self.y)] < 0:
+                Cockroach.Poison[(self.x, self.y)] = 0
+            
+
+            
+    def move_cockroach_randomly(self):
+        """Cockroach performs a random walk depositing poison, moving poison (positive or negative) from cell to cell."""
+        options = -1, 0, 1        
         x = random.choice(options)
         y = random.choice(options)
         old_x, old_y = self.x, self.y
@@ -261,6 +292,7 @@ class Cockroach:
             Cockroach.Poison[(new_x, new_y)] += self.poison
             if Cockroach.Poison[(new_x, new_y)] < 0:
                 Cockroach.Poison[(new_x, new_y)] = 0
+                               
             
 
 ################################################################################
@@ -369,3 +401,38 @@ class Search:
         if len(draw_this) >= 2:
             pygame.draw.lines(screen, color, False, draw_this, 1)
 
+
+################################################################################
+################################################################################
+######## CLASSES FOR EVENTS ####################################################
+################################################################################
+################################################################################
+
+class Event:
+    E = dict()
+    def __init__(self, ID, conditions = None, possibilities = range(10)):
+        self.ID = ID
+        self.possibilities = possibilities
+        self.time_to_complete = self.initialize()
+        self.state = 0 # states are numbers from 1 to time_to_complete
+        self.in_progress = False
+        self.completed = False
+        self.conditions = conditions
+        
+        Event.E[self.ID] = self
+        
+    def initialize(self, minimum = 1):
+        self.time_to_complete = max(random.choice(self.possibilities), minimum)
+        self.in_progress = True
+
+    def update_state(self, increment = 1):
+        if self.state < self.time_to_complete:
+            if self.in_progress:
+                self.state += increment
+
+    def check_completion(self):
+        return self.state == self.time_to_complete
+    
+    def show_state(self):
+        print(self.ID, ":", self.state)
+   
