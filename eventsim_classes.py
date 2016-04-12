@@ -167,6 +167,7 @@ class Actor:
         self.ypos = y
         self.speed = speed
         self. threshold = threshold
+        self.friends = set()
         if zone is not None:
             self.initialize_in_zone(zone)
             
@@ -206,25 +207,57 @@ class Actor:
                 Cell.C[i].in_meeting = False
             Cell.C[c].is_occupied = True
 
-    @staticmethod
-    def check_meeting():
+    def check_meeting(self):
+        positions = {(Actor.A[i].x, Actor.A[i].y) for i in self.friends}
+        x, y = self.x, self.y
+        common = set(Cell.C[(x,y)].nbrs).intersection(positions)
+        if len(common) > 0:
+            for i in common:
+                ix, iy = i
+                affected = set([j for j in Cell.C[(ix, iy)].nbrs if ix in j or iy in j])
+                for c in affected:
+                    if not Cell.C[c].is_barrier:
+                        Cell.C[c].in_meeting = True
+
+    """
+    def check_meeting(self):
         positions = set([(Actor.A[i].x, Actor.A[i].y) for i in Actor.A])
-        for a in Actor.A:
-            x, y = Actor.A[a].x, Actor.A[a].y
-            common = set(Cell.C[(x,y)].nbrs).intersection(positions)
-            if len(common) > 0:
-                for i in common:
-                    ix, iy = i
-                    affected = set([i for i in Cell.C[(ix, iy)].nbrs if ix in i or iy in i])
-                    for c in affected:
-                        if not Cell.C[c].is_barrier:
-                            Cell.C[c].in_meeting = True
+        x, y = self.x, self.y
+        common = set(Cell.C[(x,y)].nbrs).intersection(positions)
+        if len(common) > 0:
+            for i in common:
+                ix, iy = i
+                affected = set([i for i in Cell.C[(ix, iy)].nbrs if ix in i or iy in i])
+                for c in affected:
+                    if not Cell.C[c].is_barrier:
+                        Cell.C[c].in_meeting = True
+    """
+    
     @staticmethod
     def reset_meeting_status():
         positions = set([(Actor.A[i].x, Actor.A[i].y) for i in Actor.A])
         for a in Actor.A:
             for i in Cell.C[(Actor.A[a].x, Actor.A[a].y)].nbrs:
                 Cell.C[i].in_meeting = False
+
+    @staticmethod
+    def make_friends():
+        actors = set(list(Actor.A.keys()))
+        for a in Actor.A:
+            count = 0
+            friends = random.randint(1, min(10,len(actors)))
+            while count < friends:
+                new_friend = random.choice(list(actors))
+                if new_friend not in Actor.A[a].friends:
+                    Actor.A[a].friends.add(new_friend)
+                    count += 1
+
+    @staticmethod
+    def make_all_friends():
+        actors = set(list(Actor.A.keys()))
+        for a in Actor.A:
+            Actor.A[a].friends = actors
+            
 
     def move_with_keys(self, key):
         pass
@@ -435,4 +468,15 @@ class Event:
     
     def show_state(self):
         print(self.ID, ":", self.state)
+   
+class Move:
+    def __init__(self, actor, target, search_space, conditions):
+        pass
+    
+                    
+
+
+
+
+
    

@@ -1,4 +1,4 @@
-#!/usr/bin/python3.4
+#!/usr/bin/python3.5
 
 import sys, time, math, random, heapq, pygame, numpy
 from operator import itemgetter
@@ -8,11 +8,11 @@ from colors import *
 
 def run():
     pygame.init()
-    w, h, s = 1100, 600, 3
+    w, h, s = 1100, 600, 5
     clock = pygame.time.Clock()  # create a clock object
     FPS = 1  # set frame rate in frames per second.
     screen = pygame.display.set_mode((w, h))  # create screen
-    create_space(w, h, s, "Cardiology_1.png") #Create a dictionary of all cells.
+    create_space(w, h, s, "Cardiology_2.png") #Create a dictionary of all cells.
     zone_size = 12  # The minimum zone size possible is 4. Program will break for sizes below 4.
     top_left = (1, 1)
     create_zones(w, h, s, top_left = top_left, zone_size = zone_size)
@@ -56,7 +56,7 @@ def run():
 #####################INITIALIZING SPACE, ACTORS, THRESHOLDS################################################
 
 def create_space(w, h, s, img):
-    img = Image.open("Cardiology_2.png")
+    img = Image.open(img)
     width, height = img.size
     print(width, height)
     rgbvals = dict()
@@ -69,7 +69,7 @@ def create_space(w, h, s, img):
             g = 1.0*g/(s*s)
             b = 1.0*b/(s*s)
             rgbvals[(i,j)] = (r, g, b)
-
+            
     for i in range(int(w/s)):
         for j in range(int(h/s)):
             Cell(i, j, s)

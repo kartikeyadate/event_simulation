@@ -16,7 +16,7 @@ def run_events():
 
 def run():
     pygame.init()
-    w, h, s = 640, 640, 8
+    w, h, s = 1000, 750, 10
 #    w, h, s = 1100, 600, 10
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
@@ -24,13 +24,13 @@ def run():
     create_space(w, h, s) #Create a dictionary of all cells.
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
-    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 15) #Create zones, thresholds, walls search graphs
+    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 13) #Create zones, thresholds, walls search graphs
     poison_threshold = 25
-    create_actors(100, poison_threshold)
-    infested_zones = choose_zones_to_infest(3)
+    infested_zones = choose_zones_to_infest(10)
     for zone in infested_zones:
         make_roaches(20, 3, 20, tomato, z = zone)
         make_roaches(5, 5, -40, lightgrey, z = zone)
+    create_actors(50, poison_threshold)
     make_roaches(150, 3, 25, tomato)  # 1 DataMap        
     make_roaches(50, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
@@ -43,9 +43,8 @@ def run():
         draw_space(screen, drawing_type = "graph")
         draw_poison(screen, white, poison_threshold, drawing_type = "graph")
         draw_actors(screen)
-#        conduct_searches(threshold_graph, screen)        
-#        if tf > 100 and tf % 2:
         conduct_searches(threshold_graph, screen)
+#        search_for_a_friend(threshold_graph, screen)
         manage_events(screen, threshold_graph)
         pygame.display.update()
         if tf % 100 == 0:
@@ -114,10 +113,15 @@ def create_zones(w, h, s, top_left = (3, 3), zone_size = 20):
 def create_actors(n, threshold):
     count = 0
     zone_ids = list(Zone.Z.keys())
+    print(zone_ids)
     allcolors = (midnightblue, teal, darkgreen, red, None)
     while count < n:
         Actor(str(count), color = random.choice(allcolors), zone = random.choice(zone_ids), threshold = threshold)
         count += 1
+    Actor.make_all_friends()
+#    Actor.make_friends()
+    for a in Actor.A:
+        print(a, Actor.A[a].friends)        
 
 def move_actors(infested_zones):
     clean_zones = list(set([i for i in Zone.Z.keys()]).difference(set(infested_zones)))
@@ -133,9 +137,9 @@ def reset_actors():
     for a in Actor.A:
         Actor.A[a].initialize_in_zone(random.choice(zones))
 
-
 def choose_zones_to_infest(n):
     allzones = [i for i in Zone.Z.keys()]
+    print(allzones)
     zones_to_infest = list()
     count = 0
     while count < n:
@@ -250,7 +254,7 @@ def conduct_searches(threshold_graph, screen):
 #    """
     for i in range(0, actors, 2):
         if str(i) in Actor.A.keys() and str(i+1) in Actor.A.keys():
-            Actor.check_meeting()
+            Actor.A[str(i)].check_meeting()
             search(Actor.A[str(i)], Actor.A[str(i+1)], threshold_graph, screen)        
 #    """
     """
@@ -259,6 +263,13 @@ def conduct_searches(threshold_graph, screen):
             Actor.check_meeting()
             search(Actor.A[str(i)], Actor.A['0'], threshold_graph, screen)        
     """
+
+def search_for_a_friend(threshold_graph, screen):
+    for a in Actor.A:
+        if len(Actor.A[a].friends) > 0:
+            Actor.A[a].check_meeting()
+            search(Actor.A[a], Actor.A[random.choice(list(Actor.A[a].friends))], threshold_graph, screen)
+
 
 ############ DRAWING FUNCTIONS #################################################
 
