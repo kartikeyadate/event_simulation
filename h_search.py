@@ -16,7 +16,7 @@ def run_events():
 
 def run():
     pygame.init()
-    w, h, s = 1000, 750, 10
+    w, h, s = 1400, 800, 5
 #    w, h, s = 1100, 600, 10
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
@@ -77,6 +77,7 @@ def create_space(w, h, s):
     for i in range(int(w/s)):
         for j in range(int(h/s)):
             Cell(i, j, s)
+    Cell.assign_neighbours()            
 
 def create_zones(w, h, s, top_left = (3, 3), zone_size = 20):
     ID = 0
@@ -94,9 +95,8 @@ def create_zones(w, h, s, top_left = (3, 3), zone_size = 20):
             zone.make_walls()
             zone.refine_thresholds()
             zone.make_search_graph()
-            print("Created Zone ", str(ID))
             ID += 1
-
+    print("Created Zones")
     for c in Cell.T:
         Cell.T[c] = list(set(Cell.T[c]))
     
@@ -113,15 +113,12 @@ def create_zones(w, h, s, top_left = (3, 3), zone_size = 20):
 def create_actors(n, threshold):
     count = 0
     zone_ids = list(Zone.Z.keys())
-    print(zone_ids)
     allcolors = (midnightblue, teal, darkgreen, red, None)
     while count < n:
         Actor(str(count), color = random.choice(allcolors), zone = random.choice(zone_ids), threshold = threshold)
         count += 1
     Actor.make_all_friends()
 #    Actor.make_friends()
-    for a in Actor.A:
-        print(a, Actor.A[a].friends)        
 
 def move_actors(infested_zones):
     clean_zones = list(set([i for i in Zone.Z.keys()]).difference(set(infested_zones)))
@@ -139,7 +136,6 @@ def reset_actors():
 
 def choose_zones_to_infest(n):
     allzones = [i for i in Zone.Z.keys()]
-    print(allzones)
     zones_to_infest = list()
     count = 0
     while count < n:
@@ -256,14 +252,14 @@ def conduct_searches(threshold_graph, screen):
         if str(i) in Actor.A.keys() and str(i+1) in Actor.A.keys():
             Actor.A[str(i)].check_meeting()
             search(Actor.A[str(i)], Actor.A[str(i+1)], threshold_graph, screen)        
+
 #    """
     """
     for i in range(0, actors):
         if str(i) in Actor.A.keys():
-            Actor.check_meeting()
+            Actor.A[str(i)].check_meeting()
             search(Actor.A[str(i)], Actor.A['0'], threshold_graph, screen)        
     """
-
 def search_for_a_friend(threshold_graph, screen):
     for a in Actor.A:
         if len(Actor.A[a].friends) > 0:

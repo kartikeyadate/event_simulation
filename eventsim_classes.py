@@ -25,17 +25,15 @@ class Cell:
         Cell.C[(self.x, self.y)] = self
         Cell.size = self.s
 
-  
+
     def neighbours(self):
         x, y = self.x, self.y
         results = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
                    (x + 1, y + 1), (x + 1, y - 1), (x - 1, y + 1), (x - 1, y - 1)]
-        nbrs = list()
-        for r in results:
-            if r in list(Cell.C.keys()):
-                nbrs.append(r)
+        nbrs = [r for r in results if r in Cell.C.keys()]
         return nbrs
-    
+  
+   
     def draw_cell(self, screen, drawing_type = None, color = None):
         r = max(2, int(Cell.size/2.5))
         if self.is_barrier:
@@ -70,6 +68,12 @@ class Cell:
 
     def is_orthogonal_neighbour(self, c):
         return c in [(self.x + 1, self.y), (self.x - 1, self.y), (self.x, self.y + 1), (self.x, self.y - 1)]
+
+    @staticmethod
+    def assign_neighbours():
+        for c in Cell.C:
+            Cell.C[c].nbrs = Cell.C[c].neighbours()
+        
 
 class Zone:
     Z = dict()
