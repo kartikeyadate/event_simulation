@@ -6,7 +6,6 @@ from collections import defaultdict
 from colors import *
 from eventsim_classes import *
 
-
 def run_events():
     for i in range(10):
         e = Event(str(i))
@@ -16,7 +15,7 @@ def run_events():
 
 def run():
     pygame.init()
-    w, h, s = 1400, 800, 5
+    w, h, s = 600, 600, 10
 #    w, h, s = 1100, 600, 10
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
@@ -24,15 +23,15 @@ def run():
     create_space(w, h, s) #Create a dictionary of all cells.
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
-    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 13) #Create zones, thresholds, walls search graphs
+    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 14) #Create zones, thresholds, walls search graphs
     poison_threshold = 25
     infested_zones = choose_zones_to_infest(10)
     for zone in infested_zones:
         make_roaches(20, 3, 20, tomato, z = zone)
         make_roaches(5, 5, -40, lightgrey, z = zone)
-    create_actors(50, poison_threshold)
-    make_roaches(150, 3, 25, tomato)  # 1 DataMap        
-    make_roaches(50, 5, -50, lightgrey)  # 3 DataMap
+    create_actors(2, poison_threshold)
+    make_roaches(100, 3, 25, tomato)  # 1 DataMap        
+    make_roaches(30, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
     tf = 0
     while True:
@@ -271,8 +270,10 @@ def search_for_a_friend(threshold_graph, screen):
 
 def draw_actors(screen):
     for a in Actor.A:
+        for c in Actor.A[a].personal_space:
+            Cell.C[c].draw_cell(screen, drawing_type = "graph", color = gold)
         Actor.A[a].draw_actor(screen)
-            
+        
 def draw_space(screen, drawing_type = "graph"):
     for c in Cell.C:
         Cell.C[c].draw_cell(screen, drawing_type = drawing_type)

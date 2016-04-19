@@ -36,16 +36,17 @@ class Cell:
    
     def draw_cell(self, screen, drawing_type = None, color = None):
         r = max(2, int(Cell.size/2.5))
-        if self.is_barrier:
-            color = chocolate
-        elif not self.is_barrier:
-            color = lightgrey
-        if self.in_threshold and not self.is_barrier:
-            color = gold
-        if self.in_zone and not self.in_threshold:
-            color = wheat
-        if self.in_meeting:
-            color = green
+        if color is None:
+            if self.is_barrier:
+                color = chocolate
+            elif not self.is_barrier:
+                color = lightgrey
+            if self.in_threshold and not self.is_barrier:
+                color = gold
+            if self.in_zone and not self.in_threshold:
+                color = wheat
+            if self.in_meeting:
+                color = green
         if drawing_type == "graph":
             pygame.draw.circle(screen, color, (self.x * self.s + int(self.s/2), self.y * self.s + int(self.s/2)), r)
         if drawing_type == "grid":
@@ -160,25 +161,41 @@ class Zone:
 ################################################################################
 ################################################################################
 
-
 class Actor:
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, speed = 1.0):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0)):
         self.name = name
         self.x = x
         self.y = y
-        self.xpos = x
-        self.ypos = y
-        self.speed = speed
+        self.facing = facing
         self. threshold = threshold
         self.friends = set()
         if zone is not None:
             self.initialize_in_zone(zone)
-            
         self.color = color if color is not None else crimson
         self.zone = zone
+        self.personal_space = self.update_personal_space()            
         Actor.A[self.name] = self
         Cell.C[(self.x, self.y)].is_occupied = True
+
+    def update_personal_space(self):
+        self.personal_space = None
+        ps = set()
+        fx, fy = self.facing
+        if 0 in self.facing:
+            if (self.x + fx, self.y + fy) in Cell.C.keys():
+                ps = set(Cell.C[(self.x, self.y)].nbrs)\
+                .union(Cell.C[(self.x + fx, self.y + fy)].nbrs)
+            elif (self.x + fx, self.y + fy) not in Cell.C.keys():
+                ps = set(Cell.C[(self.x, self.y)].nbrs)
+        if 0 not in self.facing:
+            if (self.x + fx*-1, self.y + fy*-1) in Cell.C.keys():
+                ps = set(Cell.C[(self.x, self.y)].nbrs)\
+                .difference(set(((self.x + fx*-1, self.y + fy*-1),)))
+            else:
+                ps = set(Cell.C[(self.x, self.y)].nbrs)
+        return ps
+   
 
     def initialize_in_zone(self, z):
         options = set(Zone.Z[z].cells.keys())
@@ -204,13 +221,18 @@ class Actor:
     
     def move(self, c):
         old = self.x, self.y
+        cx, cy = c
+        fx, fy = cx - self.x, cy - self.y
+        self.facing = fx, fy
+        self.personal_space = None
         if not Cell.C[c].is_occupied:
             self.x, self.y = c
             Cell.C[old].is_occupied = False
             for i in Cell.C[old].nbrs:
                 Cell.C[i].in_meeting = False
             Cell.C[c].is_occupied = True
-
+        self.personal_space = self.update_personal_space()
+        
     def check_meeting(self):
         positions = {(Actor.A[i].x, Actor.A[i].y) for i in self.friends}
         x, y = self.x, self.y
