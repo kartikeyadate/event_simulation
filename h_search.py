@@ -15,7 +15,7 @@ def run_events():
 
 def run():
     pygame.init()
-    w, h, s = 600, 600, 10
+    w, h, s = 560, 680, 8
 #    w, h, s = 1100, 600, 10
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
@@ -23,13 +23,13 @@ def run():
     create_space(w, h, s) #Create a dictionary of all cells.
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
-    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 14) #Create zones, thresholds, walls search graphs
+    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 13) #Create zones, thresholds, walls search graphs
     poison_threshold = 25
     infested_zones = choose_zones_to_infest(10)
     for zone in infested_zones:
         make_roaches(20, 3, 20, tomato, z = zone)
         make_roaches(5, 5, -40, lightgrey, z = zone)
-    create_actors(2, poison_threshold)
+    create_actors(20, poison_threshold)
     make_roaches(100, 3, 25, tomato)  # 1 DataMap        
     make_roaches(30, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
@@ -189,7 +189,7 @@ def search(actor_a, actor_b, threshold_graph, screen):
         S = Search((ax, ay), (bx, by), graph = threshold_graph, threshold = poison_threshold)
         if S.path is not None:
             if len(S.path) > 1:
-                S.draw_route(screen, color = lightgrey)
+                S.draw_route(screen, color = verylightgrey)
                 s, g = S.path[:2]
                 z = get_search_zone(s, g)            
                 search_graph = Zone.Z[z].graph
@@ -199,7 +199,7 @@ def search(actor_a, actor_b, threshold_graph, screen):
                     search_graph[g] = Cell.C[s].neighbours()
                 s_internal = Search(s, g, graph = search_graph, threshold = poison_threshold)
                 if s_internal.path is not None and len(s_internal.path) > 1:
-                    s_internal.draw_route(screen, color = midnightblue)
+                    s_internal.draw_route(screen, color = white)
                     actor_a.move(s_internal.path[1])
                     s_internal.path.pop(0)
 #                elif s_internal.path is None:
@@ -237,6 +237,7 @@ def get_search_zone(c1, c2):
                 
 def conduct_searches(threshold_graph, screen):
     actors = len(Actor.A)
+
     """
     Actor.check_meeting()
     search(Actor.A['0'], Actor.A['1'], threshold_graph, screen)
@@ -246,6 +247,7 @@ def conduct_searches(threshold_graph, screen):
     search(Actor.A['6'], Actor.A['5'], threshold_graph, screen)
     search(Actor.A['3'], Actor.A['4'], threshold_graph, screen)                                            
     """
+
 #    """
     for i in range(0, actors, 2):
         if str(i) in Actor.A.keys() and str(i+1) in Actor.A.keys():
@@ -253,12 +255,14 @@ def conduct_searches(threshold_graph, screen):
             search(Actor.A[str(i)], Actor.A[str(i+1)], threshold_graph, screen)        
 
 #    """
+
     """
     for i in range(0, actors):
         if str(i) in Actor.A.keys():
             Actor.A[str(i)].check_meeting()
             search(Actor.A[str(i)], Actor.A['0'], threshold_graph, screen)        
     """
+
 def search_for_a_friend(threshold_graph, screen):
     for a in Actor.A:
         if len(Actor.A[a].friends) > 0:
@@ -287,4 +291,3 @@ def draw_poison(screen, color, threshold, drawing_type = None):
 if __name__ == "__main__":
     run()
 #    run_events()
-

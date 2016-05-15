@@ -216,8 +216,11 @@ class Actor:
                 
     def draw_actor(self, screen):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
+#        cx, cy, cz = max(self.color[0]//2, 0), max(self.color[1]//2, 0), max(self.color[2]//2, 0)
         radius = Cell.size // 2
-        pygame.draw.circle(screen, self.color, center, radius)
+#        a, b = Cell.size*2, Cell.size
+#        pygame.draw.ellipse(screen, (cx, cy, cz), (center[0], center[1], a, b))
+        pygame.draw.circle(screen, self.color, center, radius)        
     
     def move(self, c):
         old = self.x, self.y
@@ -417,11 +420,11 @@ class Search:
                 self.came_from[self.goal] = current
                 break
             #Avoid occupied cells.                
-            neighbours = [i for i in self.graph[current] if not Cell.C[i].is_occupied]
-            neighbours = [i for i in neighbours if not Cell.C[i].in_meeting]            
+            neighbours = (i for i in self.graph[current] if not Cell.C[i].is_occupied)
+            neighbours = (i for i in neighbours if not Cell.C[i].in_meeting)
             #Avoid infested cells.
-            neighbours = [i for i in neighbours if Cockroach.Poison[i] <= self.threshold]
-            if len(neighbours) > 0:
+            neighbours = (i for i in neighbours if Cockroach.Poison[i] <= self.threshold)
+            if neighbours is not None:
                 for loc in neighbours:
                     new_cost = self.cost_so_far[current] + self.min_cost(current, loc)
                     if loc not in self.cost_so_far or new_cost < self.cost_so_far[loc]:
@@ -429,8 +432,7 @@ class Search:
                         priority = new_cost + self.min_cost(current, self.goal)
                         self.open_cells.put(loc, priority)
                         self.came_from[loc] = current
-        return self.build_path()                        
-            
+        return self.build_path()
 
     def build_path(self):
         path = list()
