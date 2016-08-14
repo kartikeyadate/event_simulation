@@ -4,7 +4,7 @@ import sys, time, math, random, heapq, pygame
 from operator import itemgetter
 from collections import defaultdict
 from colors import *
-from eventsim_classes import *
+from definitions import *
 
 def run_events():
     for i in range(10):
@@ -15,21 +15,25 @@ def run_events():
 
 def run():
     pygame.init()
-    w, h, s = 560, 680, 8
-#    w, h, s = 1100, 600, 10
+#    w, h, s = 1200, 800, 8
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
     screen = pygame.display.set_mode((w, h))  # create screen
+
+    w, h, s = 1500, 600, 5
     create_space(w, h, s) #Create a dictionary of all cells.
+#    w, h = Cell.create_space_from_plan(s, "Cardiology_2.png") #Create a dictionary of all cells.    
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
-    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 13) #Create zones, thresholds, walls search graphs
+
+    #Create zones, thresholds, walls search graphs and infestation
+    threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 14) 
     poison_threshold = 25
     infested_zones = choose_zones_to_infest(10)
     for zone in infested_zones:
         make_roaches(20, 3, 20, tomato, z = zone)
         make_roaches(5, 5, -40, lightgrey, z = zone)
-    create_actors(20, poison_threshold)
+    create_actors(50, poison_threshold)
     make_roaches(100, 3, 25, tomato)  # 1 DataMap        
     make_roaches(30, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
@@ -46,9 +50,13 @@ def run():
 #        search_for_a_friend(threshold_graph, screen)
         manage_events(screen, threshold_graph)
         pygame.display.update()
-        if tf % 100 == 0:
-            print(round(1.0/(time.clock() - start),3), "fps")
+        report_fps(start, tf)
         clock.tick(FPS)
+
+def report_fps(start, tf):
+    if tf % 100 == 0:
+        print(round(1.0/(time.clock() - start),3), "frames per second")
+    
         
 def manage_events(screen, graph):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
@@ -170,7 +178,6 @@ def move_roaches():
 #        r.move_cockroach_intelligently()
         r.move_cockroach_randomly()
 
-
 ################################################################################
 ################################################################################
 ####################SEARCH FUNCTIONS ###########################################
@@ -286,7 +293,6 @@ def draw_poison(screen, color, threshold, drawing_type = None):
     for c in Cockroach.Poison:
         if Cockroach.Poison[c] >= threshold:
             Cell.C[c].draw_acceptable(screen, color, drawing_type = drawing_type)
-
 
 if __name__ == "__main__":
     run()

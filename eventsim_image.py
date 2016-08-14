@@ -8,7 +8,7 @@ from colors import *
 
 def run():
     pygame.init()
-    w, h, s = 1100, 600, 5
+    w, h, s = 1500, 655, 5 #if no plan is provided.
     clock = pygame.time.Clock()  # create a clock object
     FPS = 1  # set frame rate in frames per second.
     screen = pygame.display.set_mode((w, h))  # create screen
@@ -17,45 +17,35 @@ def run():
     top_left = (1, 1)
     create_zones(w, h, s, top_left = top_left, zone_size = zone_size)
     threshold_graph = create_threshold_graph()
-#    pygame.display.set_caption("Cardiology ward, Sourasky")
-#    background = pygame.image.load("Cardiology_1.png").convert()
-#    create_actors(50)
-    
+    pygame.display.set_caption("First Test Case")
+    background = pygame.image.load("Cardiology_2.png").convert()
+   
     frames = 0
     fps_measures = list()
     while True:
         ms1 = clock.tick()
         screen.fill(white)
-#        screen.blit(background, (1,1))
         mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
         for event in pygame.event.get():
             mark_spaces(event, mpos)
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit
-#        draw_space_from_picture(screen, drawing_type = "grid")
-        draw_space_from_picture(screen, drawing_type = "graph")        
-#        draw_space(screen, drawing_type = "graph")
-#        draw_space(screen, drawing_type = "grid")
-#        draw_actors(screen)
-#        highlight_neighbours(mpos, threshold_graph, screen)
-#        search_thresholds(threshold_graph, screen)
+        draw_space_from_picture(screen, drawing_type = "grid")        
         pygame.display.update()
 
-        ### KEEP TRACK OF FRAME RATE
-        """
-        ms2 = clock.tick()
-        if len(fps_measures) < 50:
-            fps_measures.append(1000.0/(ms2 - ms1))
-        if len(fps_measures) == 50:
-            print(int(round(sum(fps_measures)/50.0,0)), "fps")
-            fps_measures = list()
-        """
 ###########################################################################################################
 ###########################################################################################################
 #####################INITIALIZING SPACE, ACTORS, THRESHOLDS################################################
 
+def coldist(a, b):
+    x1, y1, z1 = a
+    x2, y2, z2 = b
+    return math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
+    
+
 def create_space(w, h, s, img):
+    spaces = {"threshold":(255,0,0), "wall":(0,0,0), "space": (255, 255, 255), "ignore":(0, 255, 0)}
     img = Image.open(img)
     width, height = img.size
     print(width, height)
@@ -63,8 +53,8 @@ def create_space(w, h, s, img):
     distinctvals = set()
     for i in range(width):
         for j in range(height):
-            rgbvals[(i,j)] = img.getpixel((i,j))[:-1]
-            r,g,b = rgbvals[(i,j)]
+            rgbvals[(i,j)] = img.getpixel((i,j))
+            r,g,b = rgbvals[(i,j)][:-1]
             r = 1.0*r/(s*s)
             g = 1.0*g/(s*s)
             b = 1.0*b/(s*s)
@@ -73,7 +63,7 @@ def create_space(w, h, s, img):
     for i in range(int(w/s)):
         for j in range(int(h/s)):
             Cell(i, j, s)
-    
+            
     for c in Cell.C:
         x1, y1 = Cell.C[c].rect.topleft
         x2, y2 = Cell.C[c].rect.bottomright
@@ -82,13 +72,12 @@ def create_space(w, h, s, img):
                 if (i,j) in rgbvals:
                     Cell.C[c].colors.append(rgbvals[(i,j)])
         Cell.C[c].colors = tuple([int(sum(i)) for i in zip(*Cell.C[c].colors)])
-
-        if Cell.C[c].colors[0] < 230 and Cell.C[c].colors[1] < 230:
-            Cell.C[c].colors = darkgrey
-        elif Cell.C[c].colors[0] > 250 and Cell.C[c].colors[1] < 200:
-            Cell.C[c].colors = orange
-        else:
-            Cell.C[c].colors = wheat
+        distances = list()
+        for k in spaces:
+            distances.append((coldist(Cell.C[c].colors, spaces[k]), spaces[k]))
+        closest = sorted(distances, key = itemgetter(0))[0]
+        Cell.C[c].colors = closest[1]
+        
 
 def create_actors(n):
 #        def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None):            
@@ -377,7 +366,6 @@ class Actor:
 ##################################################
 ##################################################
 
-
 class PriorityQueue:
     """A wrapper class around python's heapq class. 
        An instance of this class
@@ -420,9 +408,6 @@ class Search_Zone:
         elif abs(y2 - y1) == abs (x2 - x1):
             return 14 * abs(y2 - y1)
      
-
-        
-
 class Search:
     def __init__(self, start, goal, graph = None):
         self.start = start

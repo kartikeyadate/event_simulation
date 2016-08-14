@@ -29,12 +29,7 @@ def run():
     p = Actor("p", x, y, s, space, cadetblue, 20)
     tg = Actor("tg", x1, y1, s, space, teal, 10)
     graph = make_threshold_graph()
-    print(Room.rooms_for_threshold.keys())
-    print(Room.thresholds_in_room.keys())
-    print(len(space.cells.keys()), "cells")
-    print(len(Room.rooms.keys()), "rooms")
-    print(len(Room.rooms_for_threshold.keys()), "thresholds")
-    
+   
     while True:
         simulate(screen, space, Cockroach.Roaches, Actor.Actors, Cockroach.Poison, white)
 #        move(p, tg, space, screen, gold)

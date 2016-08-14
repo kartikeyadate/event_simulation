@@ -1,12 +1,11 @@
 import sys, time, math, random, heapq, pygame
+from PIL import Image
 from operator import itemgetter
 from collections import defaultdict
 from colors import *
 
 ################################################################################
-################################################################################
 #### SPACE CLASSES #############################################################
-################################################################################
 ################################################################################
 
 class Cell:
@@ -21,6 +20,7 @@ class Cell:
         self.in_meeting = False
         self.zones = set()
         self.nbrs = list()
+        self.color = None
         self.rect = pygame.Rect(self.x * self.s, self.y * self.s, self.s, self.s)
         Cell.C[(self.x, self.y)] = self
         Cell.size = self.s
@@ -59,8 +59,8 @@ class Cell:
         if drawing_type == "grid":
             pygame.draw.rect(screen, color, self.rect, 1)
                    
-    
     def highlight_cell(self, screen, color, drawing_type = None):
+        """Highlight current instance of cell on the screen with color c using drawing type grid or graph"""
         r = max(2, int(Cell.size/2.5))
         if drawing_type == "grid":
             pygame.draw.rect(screen, color, self.rect, 1)
@@ -68,12 +68,69 @@ class Cell:
             pygame.draw.circle(screen, color, (self.x * self.s + int(self.s/2), self.y * self.s + int(self.s/2)), r)
 
     def is_orthogonal_neighbour(self, c):
+        """Returns true if c is an orthogonal neighbour of the current cell instance"""
         return c in [(self.x + 1, self.y), (self.x - 1, self.y), (self.x, self.y + 1), (self.x, self.y - 1)]
+    
+    def is_diagonal_neighbour(self, c):
+        """Returns true if c is a diagonal neighbour of the current cell instance"""
+        return c in [(self.x + 1, self.y + 1), (self.x - 1, self.y + 1), (self.x - 1, self.y - 1), (self.x + 1, self.y - 1)]    
 
     @staticmethod
     def assign_neighbours():
         for c in Cell.C:
             Cell.C[c].nbrs = Cell.C[c].neighbours()
+
+    @staticmethod
+    def create_space(w, h, s):
+        """Creates a 2 dimensional array of cells in a space of width w and height h pixels. Each cell is a square of size s pixels"""
+        for i in range(int(w/s)):
+            for j in range(int(h/s)):
+                Cell(i, j, s)
+        Cell.assign_neighbours()            
+
+
+    @staticmethod
+    def create_space_from_image(w, h, s, img, spaces = {"threshold":(255,0,0), "wall":(0,0,0), "space": (255, 255, 255), "ignore":(0, 255, 0)}):
+        """
+        Creates a 2 dimensional array of cells in a space of width w and height h pixels. Each size is a square of size s pixels. The keyword argument spaces contains a dictionary of cell types and the colors associated which each cell type. This method adds the correct color classification to each space type based on this dictionary. By default the four types of spaces are defined, and the picture used for this program (the img argument) should be a floor plan containing these four colors.
+        'threshold': (255,0,0) [red],
+        'wall': (0,0,0) [black],
+        'space': (255, 255, 255) [white],
+        'ignore': (0, 255, 0) [green]
+        Requires PIL (Python Image Library)
+        """
+        img = Image.open(img)
+        width, height = img.size
+        print(width, height)
+        rgbvals = dict()
+        distinctvals = set()
+        for i in range(width):
+            for j in range(height):
+                rgbvals[(i,j)] = img.getpixel((i,j))
+                r,g,b = rgbvals[(i,j)][:-1]
+                r = 1.0*r/(s*s)
+                g = 1.0*g/(s*s)
+                b = 1.0*b/(s*s)
+                rgbvals[(i,j)] = (r, g, b)
+                
+        for i in range(int(w/s)):
+            for j in range(int(h/s)):
+                Cell(i, j, s)
+                
+        for c in Cell.C:
+            x1, y1 = Cell.C[c].rect.topleft
+            x2, y2 = Cell.C[c].rect.bottomright
+            for i in range(x1, x2):
+                for j in range(y1, y2):
+                    if (i,j) in rgbvals:
+                        Cell.C[c].color.append(rgbvals[(i,j)])
+            Cell.C[c].color = tuple([int(sum(i)) for i in zip(*Cell.C[c].color)])
+            distances = list()
+            for k in spaces:
+                distances.append((coldist(Cell.C[c].color, spaces[k]), spaces[k]))
+            closest = sorted(distances, key = itemgetter(0))[0]
+            Cell.C[c].color = closest[1]
+        pass            
         
 
 class Zone:
@@ -156,9 +213,7 @@ class Zone:
     
 
 ################################################################################
-################################################################################
 #### ACTOR CLASSES #############################################################
-################################################################################
 ################################################################################
 
 class Actor:
@@ -291,8 +346,6 @@ class Actor:
     def move_with_keys(self, key):
         pass
 
-
-
 class Cockroach:
     Roaches = list()
     Poison = defaultdict(int)
@@ -305,11 +358,50 @@ class Cockroach:
         self.color = color
         Cockroach.Poison[(x, y)] = 0
         Cockroach.Roaches.append(self)
+    
+    @staticmethod
+    def total_poison():
+        return sum(Cockroach.Poison.values())
 
     def draw_cockroach(self, screen):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
         radius = Cell.size // 2
         pygame.draw.circle(screen, self.color, center, radius)
+
+
+    def move_antidote_intelligently(self):
+        """The cleaner cockroaches do not perform random walks. Instead they move to the worst infested cell."""
+                   
+        if self.poison <= 0:
+            target = [(Cockroach.Poison[i],i) for i in Cell.C[(self.x, self.y)].nbrs if not Cell.C[(self.x, self.y)].is_barrier]
+            total_poison = sum([j[0] for j in target])
+            if total_poison > 0:
+                target = random.choice([i for i in target if i == max(target)])
+                self.x, self.y = target[1][0], target[1][1]
+            else:
+                self.x, self.y = random.choice(Cell.C.keys())
+            Cockroach.Poison[(self.x, self.y)] += self.poison
+            if Cockroach.Poison[(self.x, self.y)] < 0:
+                Cockroach.Poison[(self.x, self.y)] = 0
+
+    def move_antidote_randomly(self):
+        """Cockroach performs a random walk depositing poison, moving poison (positive or negative) from cell to cell."""
+        if self.poison <= 0:
+            options = -1, 0, 1        
+            x = random.choice(options)
+            y = random.choice(options)
+            old_x, old_y = self.x, self.y
+            new_x, new_y = self.x + x, self.y + y
+            if (new_x, new_y) in Cell.C.keys() and not Cell.C[(new_x, new_y)].is_barrier:
+                if self.poison > 0:
+                    Cockroach.Poison[(old_x, old_y)] -= (self.poison - 1)
+                    if Cockroach.Poison[(old_x, old_y)] < 0:
+                        Cockroach.Poison[(old_x, old_y)] = 0
+                self.x, self.y = new_x, new_y
+                Cockroach.Poison[(new_x, new_y)] += self.poison
+                if Cockroach.Poison[(new_x, new_y)] < 0:
+                    Cockroach.Poison[(new_x, new_y)] = 0
+
 
     def move_cockroach_intelligently(self):
         """The cleaner cockroaches do not perform random walks. Instead they move to the worst infested cell."""
@@ -327,42 +419,29 @@ class Cockroach:
                 Cockroach.Poison[(new_x, new_y)] += self.poison
                 if Cockroach.Poison[(new_x, new_y)] < 0:
                     Cockroach.Poison[(new_x, new_y)] = 0
-                    
-        elif self.poison <= 0:
-            target = [(Cockroach.Poison[i],i) for i in Cell.C[(self.x, self.y)].nbrs if not Cell.C[(self.x, self.y)].is_barrier]
-            target = random.choice([i for i in target if i == max(target)])
-            self.x, self.y = target[1][0], target[1][1]
-            Cockroach.Poison[(self.x, self.y)] += self.poison
-            if Cockroach.Poison[(self.x, self.y)] < 0:
-                Cockroach.Poison[(self.x, self.y)] = 0
-            
-
             
     def move_cockroach_randomly(self):
         """Cockroach performs a random walk depositing poison, moving poison (positive or negative) from cell to cell."""
-        options = -1, 0, 1        
-        x = random.choice(options)
-        y = random.choice(options)
-        old_x, old_y = self.x, self.y
-        new_x, new_y = self.x + x, self.y + y
-        if (new_x, new_y) in Cell.C.keys() and not Cell.C[(new_x, new_y)].is_barrier:
-            if self.poison > 0:
-                Cockroach.Poison[(old_x, old_y)] -= (self.poison - 1)
-                if Cockroach.Poison[(old_x, old_y)] < 0:
-                    Cockroach.Poison[(old_x, old_y)] = 0
-            self.x, self.y = new_x, new_y
-            Cockroach.Poison[(new_x, new_y)] += self.poison
-            if Cockroach.Poison[(new_x, new_y)] < 0:
-                Cockroach.Poison[(new_x, new_y)] = 0
+        if self.poison > 0:
+            options = -1, 0, 1        
+            x = random.choice(options)
+            y = random.choice(options)
+            old_x, old_y = self.x, self.y
+            new_x, new_y = self.x + x, self.y + y
+            if (new_x, new_y) in Cell.C.keys() and not Cell.C[(new_x, new_y)].is_barrier:
+                if self.poison > 0:
+                    Cockroach.Poison[(old_x, old_y)] -= (self.poison - 1)
+                    if Cockroach.Poison[(old_x, old_y)] < 0:
+                        Cockroach.Poison[(old_x, old_y)] = 0
+                self.x, self.y = new_x, new_y
+                Cockroach.Poison[(new_x, new_y)] += self.poison
+                if Cockroach.Poison[(new_x, new_y)] < 0:
+                    Cockroach.Poison[(new_x, new_y)] = 0
                                
             
-
-################################################################################
 ################################################################################
 ######## CLASSES FOR SEARCH ####################################################
 ################################################################################
-################################################################################
-
 
 class PriorityQueue:
     """A wrapper class around python's heapq class. 
@@ -464,9 +543,7 @@ class Search:
 
 
 ################################################################################
-################################################################################
 ######## CLASSES FOR EVENTS ####################################################
-################################################################################
 ################################################################################
 
 class Event:
