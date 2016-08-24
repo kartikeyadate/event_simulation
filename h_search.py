@@ -16,11 +16,11 @@ def run_events():
 def run():
     pygame.init()
 #    w, h, s = 1200, 800, 8
+    w, h, s = 1500, 600, 5
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
     screen = pygame.display.set_mode((w, h))  # create screen
 
-    w, h, s = 1500, 600, 5
     create_space(w, h, s) #Create a dictionary of all cells.
 #    w, h = Cell.create_space_from_plan(s, "Cardiology_2.png") #Create a dictionary of all cells.    
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
