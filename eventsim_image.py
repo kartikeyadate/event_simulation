@@ -45,7 +45,7 @@ def coldist(a, b):
     
 
 def create_space(w, h, s, img):
-    spaces = {"threshold":(255,0,0), "wall":(0,0,0), "space": (255, 255, 255), "ignore":(0, 255, 0)}
+    spaces = {"threshold":(255,0,0), "wall":(0,0,0), "space": (255, 255, 255), "ignore":(0, 255, 0), "equipment": (255, 255,0)}
     img = Image.open(img)
     width, height = img.size
     print(width, height)
@@ -54,7 +54,11 @@ def create_space(w, h, s, img):
     for i in range(width):
         for j in range(height):
             rgbvals[(i,j)] = img.getpixel((i,j))
-            r,g,b = rgbvals[(i,j)][:-1]
+            if len(rgbvals[(i,j)]) == 4:
+                r,g,b = rgbvals[(i,j)][:-1]
+            elif len(rgbvals[(i,j)]) == 3:
+                r,g,b = rgbvals[(i,j)]            
+            
             r = 1.0*r/(s*s)
             g = 1.0*g/(s*s)
             b = 1.0*b/(s*s)

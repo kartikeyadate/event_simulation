@@ -88,7 +88,6 @@ class Cell:
                 Cell(i, j, s)
         Cell.assign_neighbours()            
 
-
     @staticmethod
     def create_space_from_plan(s, img, spaces = {"threshold":(255,0,0), "wall":(0,0,0), "space": (255, 255, 255), "ignore":(0, 255, 0)}):
         """
@@ -107,7 +106,10 @@ class Cell:
         for i in range(width):
             for j in range(height):
                 rgbvals[(i,j)] = img.getpixel((i,j))
-                r,g,b = rgbvals[(i,j)][:-1]
+                if len(rgbvals[(i,j)]) == 4:
+                    r,g,b = rgbvals[(i,j)][:-1]
+                elif len(rgbvals[(i, j)]) == 3:
+                    r,g,b = rgbvals[(i,j)]                    
                 r = 1.0*r/(s*s)
                 g = 1.0*g/(s*s)
                 b = 1.0*b/(s*s)
@@ -120,18 +122,25 @@ class Cell:
         for c in Cell.C:
             x1, y1 = Cell.C[c].rect.topleft
             x2, y2 = Cell.C[c].rect.bottomright
+            colors = list()
             for i in range(x1, x2):
                 for j in range(y1, y2):
                     if (i,j) in rgbvals:
-                        Cell.C[c].color.append(rgbvals[(i,j)])
-            Cell.C[c].color = tuple([int(sum(i)) for i in zip(*Cell.C[c].color)])
+                        colors.append(rgbvals[(i,j)])
+            Cell.C[c].color = tuple([int(sum(i)) for i in zip(*colors)])
             distances = list()
             for k in spaces:
-                distances.append((coldist(Cell.C[c].color, spaces[k]), spaces[k]))
+                distances.append((Cell.coldist(Cell.C[c].color, spaces[k]), spaces[k]))
             closest = sorted(distances, key = itemgetter(0))[0]
             Cell.C[c].color = closest[1]
 
         return width, height
+    
+    @staticmethod
+    def coldist(a, b):
+        x1, y1, z1 = a
+        x2, y2, z2 = b
+        return math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
         
 
 class Zone:
@@ -211,7 +220,15 @@ class Zone:
         for c in cells:
             self.graph[c] = [i for i in Cell.C[c].neighbours() if not Cell.C[i].is_barrier and (i in cells)]
             Cell.C[c].nbrs = self.graph[c]
-    
+
+
+class Threshold:
+    T = dict()
+    def __init__(self, ID, cells = dict()):
+        self.ID = ID
+        self.cells = cells
+
+                
 
 ################################################################################
 #### ACTOR CLASSES #############################################################

@@ -16,26 +16,25 @@ def run_events():
 def run():
     pygame.init()
 #    w, h, s = 1200, 800, 8
-    w, h, s = 1500, 600, 5
+    w, h, s = 800, 600, 10
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
-    screen = pygame.display.set_mode((w, h))  # create screen
-
+#    s = 5
     create_space(w, h, s) #Create a dictionary of all cells.
 #    w, h = Cell.create_space_from_plan(s, "Cardiology_2.png") #Create a dictionary of all cells.    
     print("Created space of width " + repr(w) + " pixels, height " + repr(h) + " pixels and " +  repr(int(w/s)*int(h/s)) + " cells")
     print("Creating zones, thresholds and search graphs. This may take a while.... ")
-
+    screen = pygame.display.set_mode((w, h))  # create screen
     #Create zones, thresholds, walls search graphs and infestation
     threshold_graph = create_zones(w, h, s, top_left = (2,2), zone_size = 14) 
     poison_threshold = 25
     infested_zones = choose_zones_to_infest(10)
     for zone in infested_zones:
-        make_roaches(20, 3, 20, tomato, z = zone)
-        make_roaches(5, 5, -40, lightgrey, z = zone)
+        make_roaches(2, 3, 20, tomato, z = zone)
+        make_roaches(2, 5, -40, lightgrey, z = zone)
     create_actors(50, poison_threshold)
-    make_roaches(100, 3, 25, tomato)  # 1 DataMap        
-    make_roaches(30, 5, -50, lightgrey)  # 3 DataMap
+    make_roaches(40, 3, 25, tomato)  # 1 DataMap        
+    make_roaches(25, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
     tf = 0
     while True:
