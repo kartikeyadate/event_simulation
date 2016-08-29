@@ -28,18 +28,22 @@ def run(img, s = 5):
         joe.draw(screen)
         target.draw(screen)
         tg = Collection.TG
-        search(joe, target, tg, screen)
-        manage_events(screen)
+        #search(joe, target, tg, screen)
+        manage_events(screen, highlight = True, report = False)
         pygame.display.update()
         clock.tick(FPS)
     pass
 
 ################### EVENT FUNCTIONS ############################################################
         
-def manage_events(screen):
+def manage_events(screen, highlight = False, report = False):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
-    highlight_threshold(screen, mpos)
-    highlight_zone(screen, mpos)
+    if report:
+        if mpos in Cell.C.keys():
+            print(Cell.C[mpos])
+    if highlight:
+        highlight_threshold(screen, mpos)
+        highlight_zone(screen, mpos)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -61,18 +65,16 @@ def highlight_threshold(screen, mpos):
 
 def search(a, b, g, screen):
     if a.zone == b.zone and (a.zone is not None or b.zone is not None):
-        path = zone_search(a, b, a.zone)
-        if path is not None:
-            path.move()
+        ZS = zone_search(a, b)
+        if ZS.path is not None and len(ZS.path) > 1:
+            ZS.draw_route(screen, color = red)
+            a.move(ZS.path[1])
+            ZS.path.pop(0)
     elif a.zone != b.zone:
         S = threshold_search(a, b, g)
         if S.path is not None:
             S.draw_route(screen, color = darkgrey)
-            if len(S.path) > 1:
-                s, g =  S.path[:2]
-                ZS = zone_search(s,g)
-                if ZS.path is not None:
-                    ZS.draw_route(screen, color = red)
+                    
 
 def threshold_search(a, b, g):
     ax, ay = a.x, a.y
@@ -88,14 +90,15 @@ def zone_search(a, b):
     return Search(a, b, graph = Collection.Z[zone].graph)
 
 
-def get_zone(a, b):
-    if Cell.C[a].zone is not None:
-        return Cell.C[a].zone
-    elif Cell.C[b].zone is not None:
-        return Cell.C[b].zone
-    elif Cell.C[b].zone is None and Cell.C[a].zone is None:
-        zones = Cell.C[a].zones.intersection(Cell.C[b].zones)
-        return zones[0]        
+def get_zone(start, target):
+    if Cell.C[start].zone is not None:
+        return Cell.C[start].zone
+    elif Cell.C[target].zone is not None:
+        return Cell.C[target].zone
+    elif Cell.C[start].zone is None and Cell.C[target].zone is None:
+        zones = Cell.C[start].zones.intersection(Cell.C[target].zones)
+        print(zones)
+        return list(zones)[0]        
     
 """
 def search(actor_a, actor_b, threshold_graph, screen):
@@ -158,5 +161,5 @@ def get_search_zone(c1, c2):
 
 
 if __name__ == "__main__":
-    run("Cardiology_2.png", s = 4)    
+    run("cardio.png", s = 5)    
 
