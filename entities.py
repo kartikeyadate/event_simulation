@@ -4,12 +4,9 @@ from operator import itemgetter
 from collections import defaultdict
 from colors import *
 
-
-
 ######################################################################################
 #######################CLASSES DESCRIBING SPACE: CELL, COLLECTION#####################
 ######################################################################################
-
 
 class Cell(object):
     """
@@ -33,7 +30,8 @@ class Cell(object):
         self.threshold = None
         self.nbrs = list()
         self.zones = set()
-        
+        self.poison = 0
+
         Cell.C[(self.x, self.y)] = self
         Cell.size = self.s
 
@@ -48,7 +46,18 @@ class Cell(object):
             pygame.draw.circle(screen, color, (self.x * self.s + int(self.s/2), self.y * self.s + int(self.s/2)), r)
         if drawing_type == "grid":
             pygame.draw.rect(screen, color, self.rect, 1)
-        
+
+    def __repr__(self):
+        if self.in_threshold:
+            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + '); In threshold ' + str(self.threshold) + "; Adjacent Zones : " + ', '.join([str(i) for i in self.zones])
+        if self.in_zone:
+            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + '); In zone ' + str(self.zone) + "; Adjacent thresholds: " + ', '.join([str(i) for i in Collection.Z[self.zone].thresholds])
+        if not self.in_zone and not self.in_threshold:
+            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + ')'
+
+
+
+
     def neighbours(self):
         """
         Returns a list of cells neighbouring this cell. von Neumann neighbours are considered.
@@ -68,7 +77,7 @@ class Cell(object):
         nbrs = [r for r in results if r in Cell.C.keys()]
         return nbrs
 
-        
+
 
     @staticmethod
     def assign_neighbours():
@@ -102,7 +111,7 @@ class Cell(object):
         Draws every cell in the dictionary. By default, cells are graph as circles using the "graph" flag for drawing_type.
         """
         for c in Cell.C.keys():
-            if Cell.C[c].color == (0,0,0):
+            if Cell.C[c].is_barrier:
                 Cell.C[c].draw(screen, drawing_type = drawing_type, color = color)
 
 
@@ -128,16 +137,16 @@ class Cell(object):
                 if len(rgbvals[(i,j)]) == 4:
                     r,g,b = rgbvals[(i,j)][:-1]
                 elif len(rgbvals[(i, j)]) == 3:
-                    r,g,b = rgbvals[(i,j)]                    
+                    r,g,b = rgbvals[(i,j)]
                 r = 1.0*r/(s*s)
                 g = 1.0*g/(s*s)
                 b = 1.0*b/(s*s)
                 rgbvals[(i,j)] = (r, g, b)
-                
+
         for i in range(int(width/s)):
             for j in range(int(height/s)):
                 Cell(i, j, s)
-                
+
         for c in Cell.C:
             x1, y1 = Cell.C[c].rect.topleft
             x2, y2 = Cell.C[c].rect.bottomright
@@ -152,6 +161,9 @@ class Cell(object):
                 distances.append((Cell.coldist(Cell.C[c].color, spaces[k]), spaces[k]))
             closest = sorted(distances, key = itemgetter(0))[0]
             Cell.C[c].color = closest[1]
+            #Set walls.
+            if Cell.C[c].color == (0, 0, 0):
+                Cell.C[c].is_barrier = True
 
         Cell.assign_neighbours()
         return width, height
@@ -176,52 +188,58 @@ class Collection(object):
     def __init__(self, ID, TYPE):
         self.ID = ID
         self.TYPE = TYPE
-        self.cells = set()
-        self.graph = dict()
-        if self.TYPE == "z":
-            Collection.Z[self.ID] = self
-            self.thresholds = set()
-            self.threshold_cells = set()
+        self.cells = set() #keys (x,y) of cells in collection
+        self.graph = dict() #search graph for a zone.
+        self.thresholds = set() #thresholds attached to current zone.
+        self.threshold_cells = set() #keys (x,y) of cells contained in thresholds attached to current zone.
+        self.zones = set() #zones connected by current threshold (if collection is a threshold)
+        self.tnbrs = set() #neighbouring thresholds for current threshold (if collection is threshold)
+        self.available = True #whether of not the current threshold is available to the search.
         if self.TYPE == "t":
             Collection.T[self.ID] = self
-            self.zones = set()
-            self.tnbrs = set()
+        if self.TYPE == "z":
+            Collection.Z[self.ID] = self
+
+    def __repr__(self):
+        if self.TYPE == "t":
+            return "Type: " + self.TYPE + '; ID: ' + self.ID + "; Zones: " + ', '.join([i for i in self.zones])
+        elif self.TYPE == "z":
+            return "Type: " + self.TYPE + '; ID: ' + self.ID + "; Thresholds: " + ', '.join([i for i in self.thresholds])
 
     def create_zone_graph(self):
         all_cells = self.cells.union(self.threshold_cells)
         for c in all_cells:
-            self.graph[c] = [i for i in Cell.C[c].nbrs if i in all_cells]
+            self.graph[c] = [i for i in Cell.C[c].nbrs if i in all_cells and not Cell.C[i].is_barrier]
 
     def draw(self, screen, color = None):
+        """Draw this collection"""
         for c in self.cells:
             if self.TYPE == "z":
                 if color is None:
                     Cell.C[c].draw(screen, drawing_type = "graph", color = powderblue)
                 else:
-                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)                
+                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)
             if self.TYPE == "t":
                 if color is None:
-                    Cell.C[c].draw(screen, drawing_type = "graph", color = khaki)            
+                    Cell.C[c].draw(screen, drawing_type = "graph", color = khaki)
                 else:
-                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)                                    
+                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)
 
     @staticmethod
-    def draw_everything(screen, color = None):     
+    def draw_everything(screen, color = None):
         for z in Collection.Z:
             for c in Collection.Z[z].cells:
                 if color is None:
                     Cell.C[c].draw(screen, drawing_type = "graph", color = powderblue)
                 else:
-                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)                
+                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)
 
         for t in Collection.T:
-            for c in Collection.T[t].cells:        
+            for c in Collection.T[t].cells:
                 if color is None:
                     Cell.C[c].draw(screen, drawing_type = "graph", color = khaki)
                 else:
-                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)                
-                                                
-
+                    Cell.C[c].draw(screen, drawing_type = "graph", color = color)
 
     @staticmethod
     def generate_zones_and_thresholds():
@@ -231,11 +249,11 @@ class Collection(object):
             if Cell.C[c].color == (255, 255, 255):
                 zone_cells.add(c)
             if Cell.C[c].color == (255, 0, 0):
-                threshold_cells.add(c)                
+                threshold_cells.add(c)
 
-        num = 0
-        while len(zone_cells) > 0:    
-            cells = Collection.collect(zone_cells)
+        num =0
+        while len(zone_cells) > 0:
+            cells = Collection.alt_collect(zone_cells)
             zone = Collection(str(num), "z")
             zone.cells = cells
             for cell in zone.cells:
@@ -245,8 +263,8 @@ class Collection(object):
             num += 1
 
         num = 0
-        while len(threshold_cells) > 0:    
-            cells = Collection.collect(threshold_cells)
+        while len(threshold_cells) > 0:
+            cells = Collection.alt_collect(threshold_cells)
             threshold = Collection(str(num), "t")
             threshold.cells = cells
             for cell in threshold.cells:
@@ -255,10 +273,73 @@ class Collection(object):
             threshold_cells = threshold_cells.difference(cells)
             num += 1
 
-                
+        Collection.correct_cell_allocation()
+        Collection.create_threshold_graph()
+        Collection.create_zone_graphs()
+
+    @staticmethod
+    def add_orthogonal(p, zone_cells):
+        orthos = set()
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos.add(tuple(c))
+            c[0] = c[0] + 1
+
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos.add(tuple(c))
+            c[0] = c[0] - 1
+
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos.add(tuple(c))
+            c[1] = c[1] - 1
+
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos.add(tuple(c))
+            c[1] = c[1] + 1
+
+        return orthos
+
+    @staticmethod
+    def alt_collect(zone_cells):
+        p = sorted(list(zone_cells), key = itemgetter(0,1))[0]
+        cells = set()
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos = Collection.add_orthogonal(tuple(c), zone_cells)
+            cells = cells.union(orthos)
+            c[0] = c[0] + 1
+            c[1] = c[1] + 1
+
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos = Collection.add_orthogonal(tuple(c), zone_cells)
+            cells = cells.union(orthos)
+            c[0] = c[0] - 1
+            c[1] = c[1] + 1
+
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos = Collection.add_orthogonal(tuple(c), zone_cells)
+            cells = cells.union(orthos)
+            c[0] = c[0] - 1
+            c[1] = c[1] - 1
+
+        c = list(p)
+        while tuple(c) in zone_cells:
+            orthos = Collection.add_orthogonal(tuple(c), zone_cells)
+            cells = cells.union(orthos)
+            c[0] = c[0] + 1
+            c[1] = c[1] - 1
+
+        return cells
+
+
     @staticmethod
     def collect(zone_cells):
-        p = random.choice(list(zone_cells))
+        p = sorted(list(zone_cells), key = itemgetter(0,1))[0]
         new_zone = set()
         c = list(p)
         while tuple(c) in zone_cells:
@@ -269,7 +350,7 @@ class Collection(object):
         while tuple(c) in zone_cells:
             new_zone.add(tuple(c))
             c[0] = c[0] + 1
-        
+
         first_row = copy.copy(new_zone)
         for cell in first_row:
             x = list(cell)
@@ -281,36 +362,41 @@ class Collection(object):
             while tuple(x) in zone_cells:
                 new_zone.add(tuple(x))
                 x[1] = x[1] - 1
-            
+
+
         cells = new_zone
         return cells
 
     @staticmethod
     def correct_cell_allocation():
+        #Work on zones first.
         cwb = dict()
         for z in Collection.Z.keys():
-            cells = Collection.Z[z].cells
             cells_with_neighbours = list()
-            for c in cells:
+            for c in Collection.Z[z].cells:
                 cells_with_neighbours += [i for i in Cell.C[c].nbrs if (Cell.C[i].in_zone and not Cell.C[i].in_threshold and not Cell.C[i].is_barrier)]
             cwb[z] = set(cells_with_neighbours)
+
         combos = itertools.combinations(cwb.keys(), 2)
-        tbr = set()
+        rem = set()
         for (a,b) in combos:
-            common = cwb[a].intersection(cwb[b])
-            if len(common) > 0:
-                nid = str(min(int(a), int(b)))
-                rem = str(max(int(a), int(b)))
-                new_collection = Collection.Z[a].cells.union(Collection.Z[b].cells)
-                Collection.Z[nid].cells = new_collection
-                for cell in Collection.Z[nid].cells:
-                    Cell.C[cell].in_zone = True
-                    Cell.C[cell].zone = nid
-                tbr.add(rem)
+            if len(cwb[a].intersection(cwb[b])) > 0:
+                if str(min(int(a), int(b))) == a:
+                    Collection.Z[a].cells = Collection.Z[a].cells.union(Collection.Z[b].cells)
+                    cwb[a] = cwb[a].union(cwb[b])
+                    rem.add(b)
+                elif str(min(int(a), int(b))) == b:
+                    Collection.Z[b].cells = Collection.Z[b].cells.union(Collection.Z[a].cells)
+                    cwb[b] = cwb[b].union(cwb[a])
+                    rem.add(a)
 
-        for k in tbr:
+#        print(len(set(Collection.Z.keys())))
+        #print(len(rem))
+        for k in rem:
             del Collection.Z[k]
+#        print(len(set(Collection.Z.keys())))
 
+        #Work on Thresholds
         cwb = dict()
         for t in Collection.T.keys():
             cells = Collection.T[t].cells
@@ -318,49 +404,69 @@ class Collection(object):
             for c in cells:
                 cells_with_neighbours += [i for i in Cell.C[c].orthogonal_neighbours() if (Cell.C[i].in_threshold and not Cell.C[i].in_zone and not Cell.C[i].is_barrier)]
             cwb[t] = set(cells_with_neighbours)
+
         combos = itertools.combinations(cwb.keys(), 2)
-        tbr = set()
+        rem = set()
         for (a,b) in combos:
-            common = cwb[a].intersection(cwb[b])
-            if len(common) > 0:
-                nid = str(min(int(a), int(b)))
-                rem = str(max(int(a), int(b)))
-                new_collection = Collection.T[a].cells.union(Collection.T[b].cells)
-                Collection.T[nid].cells = new_collection
-                for cell in Collection.T[nid].cells:
-                    Cell.C[cell].in_threshold = True
-                    Cell.C[cell].threshold = nid
-                tbr.add(rem)
+            if len(cwb[a].intersection(cwb[b])) > 0:
+                if str(min(int(a), int(b))) == a:
+                    Collection.T[a].cells = Collection.T[a].cells.union(Collection.T[b].cells)
+                    cwb[a] = cwb[a].union(cwb[b])
+                    rem.add(b)
+                elif str(min(int(a), int(b))) == b:
+                    Collection.T[b].cells = Collection.T[b].cells.union(Collection.T[a].cells)
+                    cwb[b] = cwb[b].union(cwb[a])
+                    rem.add(a)
 
-        for k in tbr:
+
+#        print(len(Collection.T.keys()))
+        #print(len(rem))
+        for k in rem:
             del Collection.T[k]
+#        print(len(set(Collection.T.keys())))
 
+        #Update the zone and threshold status of each cell in each zone and threshold.
         for z in Collection.Z.keys():
             for c in Collection.Z[z].cells:
                 Cell.C[c].in_zone = True
                 Cell.C[c].zone = z
                 Cell.C[c].in_threshold = False
-           
+                Cell.C[c].threshold = None
+
         for t in Collection.T.keys():
             for c in Collection.T[t].cells:
                 Cell.C[c].in_threshold = True
                 Cell.C[c].threshold = t
                 Cell.C[c].in_zone = False
-                
+                Cell.C[c].zone = None
+
+        #So far, we have organized all the cells in the space into thresholds and zones.
+        #Next, we have to store the thresholds neighbouring each zone.
+        #All neighbouring cells of a cell in zone which are threshold_cells need not constitute all the threshold cells in the zone.
+        #So, use the threshold_cell found to identify the threshold. The use threshold.cells to find all threshold cells.
+
         for z in Collection.Z.keys():
             for c in Collection.Z[z].cells:
                 for n in Cell.C[c].nbrs:
-                    if not Cell.C[n].is_barrier and Cell.C[n].in_threshold:
-                        Collection.Z[z].thresholds.add(Cell.C[n].threshold)
-                        Collection.Z[z].threshold_cells.add(n)
-                        Cell.C[n].zones.add(z)
-                        
+                    if Cell.C[n].in_threshold:
+                        t = Cell.C[n].threshold
+                        if t in Collection.T.keys():
+                            th_cells = Collection.T[t].cells
+                            Collection.Z[z].thresholds.add(t)
+                            Collection.Z[z].threshold_cells = Collection.Z[z].threshold_cells.union(th_cells)
+
+        #For every zone, the thresholds connected to it and the threshold cells attached to it are now stored.
+
         for t in Collection.T.keys():
             for c in Collection.T[t].cells:
                 for n in Cell.C[c].nbrs:
-                    if not Cell.C[n].is_barrier and Cell.C[n].in_zone:
+                    if Cell.C[n].in_zone:
                         Collection.T[t].zones.add(Cell.C[n].zone)
-                        
+
+            for c in Collection.T[t].cells:
+                Cell.C[c].zones = Collection.T[t].zones
+
+
         for t in Collection.T.keys():
             tnbrs = set()
             for z in Collection.T[t].zones:
@@ -375,8 +481,10 @@ class Collection(object):
     def create_threshold_graph():
         for t in Collection.T.keys():
             cells = set()
-            for n in Collection.T[t].tnbrs:
-                cells = cells.union(Collection.T[n].cells)
+            for z in Collection.T[t].zones:
+                if z in Collection.Z.keys():
+                    cells = cells.union(Collection.Z[z].threshold_cells)
+            cells = cells.difference(Collection.T[t].cells)
             for c in Collection.T[t].cells:
                 Collection.TG[c] = cells
 
@@ -384,8 +492,8 @@ class Collection(object):
     def create_zone_graphs():
         for z in Collection.Z.keys():
             Collection.Z[z].create_zone_graph()
-               
-        
+
+
 ######################################################################################
 #######################CLASSES DESCRIBING ACTORS: ACTOR, COCKROACHES #################
 ######################################################################################
@@ -422,19 +530,26 @@ class Actor(object):
             self.x, self.y = cx, cy
             Cell.C[(ox, oy)].is_occupied = False
             Cell.C[(self.x, self.y)].is_occupied = True
+            self.zone = Cell.C[(self.x, self.y)].zone
 
     def draw(self, screen, min_size = 4):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
-        radius = max(min_size, int(Cell.size/2))        
+        radius = max(min_size, int(Cell.size/2))
         pygame.draw.circle(screen, self.color, center, radius)
-        
+
+    @staticmethod
+    def draw_all_actors(screen, min_size = 4):
+        for a in Actor.A:
+            Actor.A[a].draw(screen, min_size = min_size)
+
+
 
 ################################################################################
 ######## CLASSES FOR SEARCH ####################################################
 ################################################################################
 
 class PriorityQueue:
-    """A wrapper class around python's heapq class. 
+    """A wrapper class around python's heapq class.
        An instance of this class
        is used to store the list of open cells."""
 
@@ -487,7 +602,7 @@ class Search:
             if current in self.graph[self.goal]:
                 self.came_from[self.goal] = current
                 break
-            #Avoid occupied cells.                
+            #Avoid occupied cells.
             neighbours = (i for i in self.graph[current] if not Cell.C[i].is_occupied)
             #Avoid infested cells.
 #            neighbours = (i for i in neighbours if Cockroach.Poison[i] <= self.threshold)
@@ -527,4 +642,3 @@ class Search:
         draw_this = [Cell.C[p].rect.center for p in self.path]
         if len(draw_this) >= 2:
             pygame.draw.lines(screen, color, False, draw_this, 1)
-

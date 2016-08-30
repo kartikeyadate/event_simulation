@@ -17,9 +17,9 @@ darkgrey = 100, 100, 100
 
 def run():
     pygame.init()  # initialize the game engine
-    w, h, s = 640, 640,23   # set width and height of the screen
+    w, h, s = 640, 640,20   # set width and height of the screen
     clock = pygame.time.Clock()  # create a clock object
-    FPS = 10  # set frame rate in frames per second.
+    FPS = 100  # set frame rate in frames per second.
     assert w % s == 0, "width must be divisible by size"
     assert h % s == 0, "height must be divisible by size"
     screen = pygame.display.set_mode((w, h))  # create screen
