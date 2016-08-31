@@ -19,7 +19,7 @@ def run():
     threshold_graph = create_threshold_graph()
     pygame.display.set_caption("First Test Case")
     background = pygame.image.load("Cardiology_2.png").convert()
-   
+
     frames = 0
     fps_measures = list()
     while True:
@@ -31,7 +31,7 @@ def run():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit
-        draw_space_from_picture(screen, drawing_type = "grid")        
+        draw_space_from_picture(screen, drawing_type = "grid")
         pygame.display.update()
 
 ###########################################################################################################
@@ -42,7 +42,7 @@ def coldist(a, b):
     x1, y1, z1 = a
     x2, y2, z2 = b
     return math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
-    
+
 
 def create_space(w, h, s, img):
     spaces = {"threshold":(255,0,0), "wall":(0,0,0), "space": (255, 255, 255), "ignore":(0, 255, 0), "equipment": (255, 255,0)}
@@ -57,17 +57,17 @@ def create_space(w, h, s, img):
             if len(rgbvals[(i,j)]) == 4:
                 r,g,b = rgbvals[(i,j)][:-1]
             elif len(rgbvals[(i,j)]) == 3:
-                r,g,b = rgbvals[(i,j)]            
-            
+                r,g,b = rgbvals[(i,j)]
+
             r = 1.0*r/(s*s)
             g = 1.0*g/(s*s)
             b = 1.0*b/(s*s)
             rgbvals[(i,j)] = (r, g, b)
-            
+
     for i in range(int(w/s)):
         for j in range(int(h/s)):
             Cell(i, j, s)
-            
+
     for c in Cell.C:
         x1, y1 = Cell.C[c].rect.topleft
         x2, y2 = Cell.C[c].rect.bottomright
@@ -81,10 +81,10 @@ def create_space(w, h, s, img):
             distances.append((coldist(Cell.C[c].colors, spaces[k]), spaces[k]))
         closest = sorted(distances, key = itemgetter(0))[0]
         Cell.C[c].colors = closest[1]
-        
+
 
 def create_actors(n):
-#        def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None):            
+#        def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None):
     count = 0
     zone_ids = list(Zone.Z.keys())
     allcolors = (midnightblue, teal, darkgreen, red, None)
@@ -103,7 +103,7 @@ def create_threshold_graph():
 
             if len(Cell.C[c].zones) == 1:
                 Cell.C[c].in_zone = False
-                
+
     for c in Cell.C:
         if Cell.C[c].in_threshold:
             invalid_thresholds = defaultdict(list)
@@ -148,12 +148,12 @@ def search_thresholds(threshold_graph, screen):
             for n in (start, goal):
                 if n not in threshold_graph:
                     threshold_graph[n] = Zone.Z[list(Cell.C[n].zones)[0]].threshold_cells.keys()
-        
+
             S = Search(start, goal, threshold_graph)
             S.get_threshold_path()
             S.draw_threshold_route(screen, color = black)
-    
-            
+
+
 
 #########################################################################################
 #########################################################################################
@@ -192,7 +192,7 @@ def draw_space_from_picture(screen, drawing_type = "grid"):
 ######## CLASSES DEFINING THE SPACE ##############
 ##################################################
 ##################################################
-   
+
 class Cell:
     C = dict()
     def __init__(self, x, y, s):
@@ -214,8 +214,8 @@ class Cell:
             pygame.draw.circle(screen, color, (self.x * self.s + int(self.s/2), self.y * self.s + int(self.s/2)), r)
         if drawing_type == "grid":
             pygame.draw.rect(screen, color, self.rect, 1)
-            
-        
+
+
     def draw_cell(self, screen, drawing_type = None):
         if self.is_barrier:
             color = chocolate
@@ -230,7 +230,7 @@ class Cell:
             pygame.draw.circle(screen, color, (self.x * self.s + int(self.s/2), self.y * self.s + int(self.s/2)), r)
         if drawing_type == "grid":
             pygame.draw.rect(screen, color, self.rect, 1)
-    
+
     def highlight_cell(self, screen, color, drawing_type = None):
         r = max(2, int(Cell.size/2.5))
         if drawing_type == "grid":
@@ -240,8 +240,8 @@ class Cell:
 
     def is_orthogonal_neighbour(self, c):
         return c in [(self.x + 1, self.y), (self.x - 1, self.y), (self.x, self.y + 1), (self.x, self.y - 1)]
-                    
-            
+
+
 class Zone:
     Z = dict()
     def __init__(self,ID, cells = None, zone_type = None):
@@ -251,32 +251,32 @@ class Zone:
         self.thresholds = list()
         self.zone_type = zone_type
         Zone.Z[self.ID] = self
-    
+
     def inside(self, c):
         return c in list(self.cells.keys())
-    
+
     def passable(self, c):
         return not Cell.C[c].is_occupied and not Cell.C[c].is_barrier and (Cell.C[c].in_zone or Cell.C[c].in_threshold)
-    
+
     def neighbours(self, c):
         results = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
                    (x + 1, y + 1), (x + 1, y - 1), (x - 1, y + 1), (x - 1, y - 1)]
         results = filter(self.inside, results)
         results = filter(self.passable, results)
         return results
-    
+
     def make_walls(self, zone_size):
         xs = sorted([c[0] for c in self.cells.keys()])
         ys = sorted([c[1] for c in self.cells.keys()])
         x_min, x_max = min(xs), max(xs)
         y_min, y_max = min(ys), max(ys)
-        if zone_size % 2 == 0: 
+        if zone_size % 2 == 0:
             mx = (x_min - 1) + zone_size // 2
-            my = (y_min - 1) + zone_size // 2            
-            
-        else: 
+            my = (y_min - 1) + zone_size // 2
+
+        else:
             mx = (x_min - 1) + zone_size // 2 + 1
-            my = (y_min - 1) + zone_size // 2 + 1            
+            my = (y_min - 1) + zone_size // 2 + 1
 
         if zone_size % 2 == 0:
             tx = mx - 2, mx - 1, mx, mx + 1, mx + 2
@@ -291,7 +291,7 @@ class Zone:
         t4 = tuple([(x_max + 1, y) for y in ty])
         self.thresholds = [t1, t2, t3, t4]
 
-        for x in range(x_min - 1, x_max + 2): 
+        for x in range(x_min - 1, x_max + 2):
             if not x in tx:
                 Cell.C[(x, y_min - 1)].is_barrier = True
                 Cell.C[(x, y_max + 1)].is_barrier = True
@@ -303,10 +303,10 @@ class Zone:
                 Cell.C[(x, y_min - 1)].in_zone = True
                 Cell.C[(x, y_max + 1)].in_zone = True
                 self.threshold_cells[(x, y_min - 1)] = Cell.C[(x, y_min - 1)]
-                self.threshold_cells[(x, y_max + 1)] = Cell.C[(x, y_max + 1)]                
+                self.threshold_cells[(x, y_max + 1)] = Cell.C[(x, y_max + 1)]
                 self.cells[(x, y_min - 1)] = Cell.C[(x, y_min - 1)]
-                self.cells[(x, y_max + 1)] = Cell.C[(x, y_max + 1)]                
-            
+                self.cells[(x, y_max + 1)] = Cell.C[(x, y_max + 1)]
+
         for y in range(y_min - 1, y_max + 2):
             if not y in ty:
                 Cell.C[(x_min - 1, y)].is_barrier = True
@@ -320,10 +320,10 @@ class Zone:
                 Cell.C[(x_max + 1, y)].is_zone = True
 
                 self.threshold_cells[(x_min - 1, y)] = Cell.C[(x_min - 1, y)]
-                self.threshold_cells[(x_max + 1, y)] = Cell.C[(x_max + 1, y)]                
+                self.threshold_cells[(x_max + 1, y)] = Cell.C[(x_max + 1, y)]
                 self.cells[(x_min - 1, y)] = Cell.C[(x_min - 1, y)]
-                self.cells[(x_max + 1, y)] = Cell.C[(x_max + 1, y)]                
-                
+                self.cells[(x_max + 1, y)] = Cell.C[(x_max + 1, y)]
+
 
 ##################################################
 ##################################################
@@ -339,7 +339,7 @@ class Actor:
         self.y = y
         if zone is not None:
             self.initialize_in_zone(zone)
-            
+
         self.color = color if color is not None else crimson
         self.zone = zone
         Actor.A[self.name] = self
@@ -348,18 +348,18 @@ class Actor:
     def initialize_in_zone(self, z):
         options = list(set(Zone.Z[z].cells.keys()).difference(set(Zone.Z[z].threshold_cells.keys())))
         self.x, self.y = random.choice(options)
-        
+
     def draw_actor(self, screen):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
         radius = Cell.size // 2
         pygame.draw.circle(screen, self.color, center, radius)
-    
+
     def move(self, c):
         old = self.x, self.y
         self.x, self.y = c
         Cell.C[old].is_occupied = False
         Cell.C[c].is_occupied = True
-    
+
     def move_with_keys(self, direction):
         pass
 
@@ -371,7 +371,7 @@ class Actor:
 ##################################################
 
 class PriorityQueue:
-    """A wrapper class around python's heapq class. 
+    """A wrapper class around python's heapq class.
        An instance of this class
        is used to store the list of open cells."""
 
@@ -411,7 +411,7 @@ class Search_Zone:
             return 14 * abs(y2 - y1) + 10 *abs((abs(y2 - y1) - abs(x2 - x1)))
         elif abs(y2 - y1) == abs (x2 - x1):
             return 14 * abs(y2 - y1)
-     
+
 class Search:
     def __init__(self, start, goal, graph = None):
         self.start = start
@@ -474,14 +474,7 @@ class Search:
 
 
 
-       
-         
+
+
 if __name__ == "__main__":
     run()
-    
-    
-    
-    
-    
-    
-    

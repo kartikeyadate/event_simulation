@@ -13,36 +13,31 @@ def run(img, s = 5):
     w, h = Cell.create_space_from_plan(s, img) #Create a dictionary of all cells.
     print("Created space consisting of ", len(Cell.C), "cells.")
     screen = pygame.display.set_mode((w, h))  # create screen
-
     Collection.generate_zones_and_thresholds()
     background = pygame.image.load(img).convert()
-    make_actors(80)
+    make_actors(20)
     tf = 0
     while True:
         tf += 1
         screen.fill(white)
-        screen.blit(background,(0,0))
-        #Cell.draw_barriers(screen)
-        #Collection.draw_everything(screen)
-        Actor.draw_all_actors(screen, min_size = 6)
+        #screen.blit(background,(0,0))
         conduct_searches(screen)
+        Cell.draw_barriers(screen)
+        Collection.draw_everything(screen)
+        Actor.draw_all_actors(screen, min_size = 5)
         manage_events(screen, highlight = True, report = False)
         pygame.display.update()
         clock.tick(FPS)
 
 ################### EVENT FUNCTIONS ############################################################
-
 def manage_events(screen, highlight = False, report = False):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
-
     if report:
         if mpos in Cell.C.keys():
             print(Cell.C[mpos])
-
     if highlight:
         highlight_threshold(screen, mpos)
         highlight_zone(screen, mpos)
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -50,7 +45,6 @@ def manage_events(screen, highlight = False, report = False):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 reset_actor_positions()
-
 
 def highlight_zone(screen, mpos):
     for z in Collection.Z:
@@ -63,9 +57,7 @@ def highlight_threshold(screen, mpos):
             for c in Collection.TG[mpos]:
                 Cell.C[c].draw(screen, drawing_type = "graph", color = tomato)
 
-
 ################### SEARCH FUNCTIONS ############################################################
-
 def search(a, b, g, screen):
     if a.zone == b.zone:
         ZS = zone_search((a.x, a.y), (b.x, b.y))
@@ -85,21 +77,18 @@ def search(a, b, g, screen):
                     a.move(ZS.path[1])
                     ZS.path.pop(0)
 
-
-
 def threshold_search(a, b, g):
-    ax, ay = a.x, a.y
-    bx, by = b.x, b.y
-    if (ax, ay) not in g:
-        g[(ax,ay)] = [i for i in Collection.Z[Cell.C[(ax,ay)].zone].threshold_cells if not Cell.C[i].is_barrier]
-    if (bx, by) not in g:
-        g[(bx,by)] = [i for i in Collection.Z[Cell.C[(bx,by)].zone].threshold_cells if not Cell.C[i].is_barrier]
-    return Search((ax, ay), (bx, by), graph = g)
+    a = a.x, a.y
+    b = b.x, b.y
+    if a not in g:
+        g[a] = [i for i in Collection.Z[Cell.C[a].zone].threshold_cells]
+    if b not in g:
+        g[b] = [i for i in Collection.Z[Cell.C[b].zone].threshold_cells]
+    return Search(a, b, graph = g)
 
 def zone_search(a, b):
     zone = get_zone(a, b)
     return Search(a, b, graph = Collection.Z[zone].graph)
-
 
 def get_zone(start, target):
     if not Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
@@ -124,7 +113,6 @@ def conduct_searches(screen):
         search(Actor.A[str(a[i])], Actor.A[str(t[i])], tg, screen)
 
 ############################################# ACTOR FUNCTIONS ########################################
-
 def make_actors(n):
     available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
     c = 0
@@ -138,9 +126,6 @@ def reset_actor_positions():
         new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
         Actor.A[a].move(new_pos)
 
-
-
-
-
+###################################### RUN ##################################################
 if __name__ == "__main__":
-    run("second.png", s = 7)
+    run("cardio_alt.png", s = 7)

@@ -15,7 +15,10 @@ class Cell(object):
     C = dict()
     def __init__(self, x, y, s):
         """
-        Initializes a cell object at location x, y. The object is a square cell of size s pixels. If the width of the space is w pixels and the height of the space is h pixels, then the location (x,y) of each cell is given by (w/s, h/s)
+        Initializes a cell object at location x, y.
+        The object is a square cell of size s pixels.
+        If the width of the space is w pixels and the height of the space is h pixels,
+        then the location (x,y) of each cell is given by (w/s, h/s)
         """
         self.x = x
         self.y = y
@@ -24,6 +27,7 @@ class Cell(object):
         self.color = None
         self.is_barrier = False
         self.is_occupied = False
+        self.is_personal =False
         self.in_zone = False
         self.in_threshold = False
         self.zone = None
@@ -37,7 +41,9 @@ class Cell(object):
 
     def draw(self, screen, drawing_type = None, color = None):
         """
-        Draws a cell as a grid square or as a circle. Requires a pygame screen object to be specified. If a color is not specified the native color of the cell (self.color) is used.
+        Draws a cell as a grid square or as a circle.
+        Requires a pygame screen object to be specified.
+        If a color is not specified the native color (self.color) is used.
         """
         r = max(2, int(Cell.size/2.5))
         if color is None:
@@ -55,12 +61,10 @@ class Cell(object):
         if not self.in_zone and not self.in_threshold:
             return "Location: " + '('+str(self.x) + ', ' + str(self.y) + ')'
 
-
-
-
     def neighbours(self):
         """
-        Returns a list of cells neighbouring this cell. von Neumann neighbours are considered.
+        Returns a list of cells neighbouring this cell.
+        von Neumann neighbours are considered.
         """
         x, y = self.x, self.y
         results = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
@@ -70,19 +74,18 @@ class Cell(object):
 
     def orthogonal_neighbours(self):
         """
-        Returns a list of cells neighbouring this cell. von Neumann neighbours are considered.
+        Returns a list of cells orthogonal neighbours this cell.
         """
         x, y = self.x, self.y
         results = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
         nbrs = [r for r in results if r in Cell.C.keys()]
         return nbrs
 
-
-
     @staticmethod
     def assign_neighbours():
         """
-        Stores the neighbours of each cell in the space in the nbrs variable of the space.
+        Stores the neighbours of each cell in the space in the nbrs
+        variable of the space.
         """
         for c in Cell.C:
             Cell.C[c].nbrs = Cell.C[c].neighbours()
@@ -90,7 +93,9 @@ class Cell(object):
     @staticmethod
     def create_space(w, h, s):
         """
-        Creates a 2 dimensional array of cells in a space of width w and height h pixels. Each cell is a square of size s pixels. The location of each cell is (w/s, h/s).
+        Creates a 2 dimensional array of cells in a space of
+        width w and height h pixels. Each cell is a square of size s pixels.
+        The location of each cell is (w/s, h/s).
         """
         for i in range(int(w/s)):
             for j in range(int(h/s)):
@@ -100,7 +105,9 @@ class Cell(object):
     @staticmethod
     def draw_space(screen, drawing_type = "graph", color = None):
         """
-        Draws every cell in the dictionary. By default, cells are graph as circles using the "graph" flag for drawing_type.
+        Draws every cell in the dictionary.
+        By default, cells are graph as circles
+        using the "graph" flag for drawing_type.
         """
         for c in Cell.C.keys():
             Cell.C[c].draw(screen, drawing_type = drawing_type, color = color)
@@ -108,24 +115,32 @@ class Cell(object):
     @staticmethod
     def draw_barriers(screen, drawing_type = "graph", color = None):
         """
-        Draws every cell in the dictionary. By default, cells are graph as circles using the "graph" flag for drawing_type.
+        Draws all barrier cells.
         """
         for c in Cell.C.keys():
             if Cell.C[c].is_barrier:
                 Cell.C[c].draw(screen, drawing_type = drawing_type, color = color)
 
-
     @staticmethod
     def create_space_from_plan(s, img, spaces = {"threshold":(255,0,0), "wall":(0,0,0), "space": (255, 255, 255), "ignore":(0, 255, 0), "equipment":(255, 255, 0)}):
         """
-        Creates a 2 dimensional array of cells in a space of width w and height h pixels. Each size is a square of size s pixels. The keyword argument spaces contains a dictionary of cell types and the colors associated which each cell type. This method adds the correct color classification to each space type based on this dictionary. By default the four types of spaces are defined, and the picture used for this program (the img argument) should be a floor plan containing these four colors.
+        Creates a 2 dimensional array of cells in a space of width w and height h pixels.
+        Each size is a square of size s pixels. T
+        he keyword argument spaces contains a dictionary of cell types
+        and the colors associated which each cell type.
+        This method adds the correct color classification to each space type
+        based on this dictionary.
+        By default the four types of spaces are defined, and the picture
+        used for this program (the img argument) should be a floor plan
+        containing these four colors.
         'threshold': (255,0,0) [red],
         'wall': (0,0,0) [black],
         'space': (255, 255, 255) [white],
         'ignore': (0, 255, 0) [green]
         'equipment':(255, 255, 0) [yellow]
         Requires PIL (Python Image Library)
-        The resulting space has w pixels width and h pixels height, where w and h are the width and height of the picture used as input.
+        The resulting space has w pixels width and h pixels height,
+        where w and h are the width and height of the picture used as input.
         """
         img = Image.open(img)
         width, height = img.size
@@ -180,7 +195,9 @@ class Cell(object):
 
 class Collection(object):
     """
-    A Collection of Cells which is either a Threshold or a Zone. Zones are stored in the dictionary Collection.Z, Thresholds are stored in the dictionary Collection.T.
+    A Collection of Cells which is either a Threshold or a Zone.
+    Zones are stored in the dictionary Collection.Z,
+    Thresholds are stored in the dictionary Collection.T.
     """
     Z = dict()
     T = dict()
@@ -195,6 +212,7 @@ class Collection(object):
         self.zones = set() #zones connected by current threshold (if collection is a threshold)
         self.tnbrs = set() #neighbouring thresholds for current threshold (if collection is threshold)
         self.available = True #whether of not the current threshold is available to the search.
+        self.actors = set()
         if self.TYPE == "t":
             Collection.T[self.ID] = self
         if self.TYPE == "z":
@@ -336,7 +354,6 @@ class Collection(object):
 
         return cells
 
-
     @staticmethod
     def collect(zone_cells):
         p = sorted(list(zone_cells), key = itemgetter(0,1))[0]
@@ -362,7 +379,6 @@ class Collection(object):
             while tuple(x) in zone_cells:
                 new_zone.add(tuple(x))
                 x[1] = x[1] - 1
-
 
         cells = new_zone
         return cells
@@ -466,7 +482,6 @@ class Collection(object):
             for c in Collection.T[t].cells:
                 Cell.C[c].zones = Collection.T[t].zones
 
-
         for t in Collection.T.keys():
             tnbrs = set()
             for z in Collection.T[t].zones:
@@ -475,7 +490,6 @@ class Collection(object):
                         if threshold != t and threshold in Collection.T.keys():
                             tnbrs.add(threshold)
             Collection.T[t].tnbrs = tnbrs
-
 
     @staticmethod
     def create_threshold_graph():
@@ -523,11 +537,30 @@ class Actor(object):
             Cell.C[(ox, oy)].is_occupied = False
         Cell.C[(self.x, self.y)].is_occupied = True
 
+        for c in Cell.C[(self.x, self.y)].nbrs:
+            if not Cell.C[c].is_barrier:
+                if Cell.C[c].in_threshold or Cell.C[c].in_zone:
+                    Cell.C[c].is_personal = True
+
+    def remove_personal_space(self):
+        for c in Cell.C[(self.x, self.y)].nbrs:
+            if not Cell.C[c].is_barrier:
+                if Cell.C[c].in_threshold or Cell.C[c].in_zone:
+                    Cell.C[c].is_personal = False
+
+    def set_personal_space(self):
+        for c in Cell.C[(self.x, self.y)].nbrs:
+            if not Cell.C[c].is_barrier:
+                if Cell.C[c].in_threshold or Cell.C[c].in_zone:
+                    Cell.C[c].is_personal = True
+
     def move(self, c):
         ox, oy = self.x, self.y
         cx, cy = c
         if not Cell.C[(cx, cy)].is_occupied:
+            self.remove_personal_space()
             self.x, self.y = cx, cy
+            self.set_personal_space()
             Cell.C[(ox, oy)].is_occupied = False
             Cell.C[(self.x, self.y)].is_occupied = True
             self.zone = Cell.C[(self.x, self.y)].zone
@@ -536,12 +569,22 @@ class Actor(object):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
         radius = max(min_size, int(Cell.size/2))
         pygame.draw.circle(screen, self.color, center, radius)
+        for c in Cell.C[(self.x, self.y)].nbrs:
+            if not Cell.C[c].is_barrier:
+                if Cell.C[c].in_threshold or Cell.C[c].in_zone:
+                    Cell.C[c].draw(screen, drawing_type = "graph", color = gold)
 
     @staticmethod
     def draw_all_actors(screen, min_size = 4):
         for a in Actor.A:
             Actor.A[a].draw(screen, min_size = min_size)
 
+    @staticmethod
+    def update_zones():
+        for a in Actor.A:
+            if Actor.A[a].zone is None:
+                c = Actor.A[a].x, Actor.A[a].y
+                print(Cell.C[c].zones)
 
 
 ################################################################################
@@ -616,7 +659,6 @@ class Search:
                         self.came_from[loc] = current
         return self.build_path()
 
-
     def build_path(self):
         path = list()
         goal_nbrs = self.graph[self.goal]
@@ -640,5 +682,5 @@ class Search:
 
     def draw_route(self, screen, color = white):
         draw_this = [Cell.C[p].rect.center for p in self.path]
-        if len(draw_this) >= 2:
+        if len(draw_this) > 1:
             pygame.draw.lines(screen, color, False, draw_this, 1)
