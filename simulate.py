@@ -1,4 +1,6 @@
-#!/usr/bin/python3.5
+#!/usr/bin/python3.5 
+#simulate.py This file contains the description of the instance of the simulation.
+#To run the simulation, run ./simulate.py in the unix terminal
 
 import sys, time, math, random, heapq, pygame
 from operator import itemgetter
@@ -15,7 +17,7 @@ def run(img, s = 5):
     screen = pygame.display.set_mode((w, h))  # create screen
     Collection.generate_zones_and_thresholds()
     background = pygame.image.load(img).convert()
-    make_actors(20)
+    make_actors(50)
     tf = 0
     while True:
         tf += 1
@@ -29,7 +31,10 @@ def run(img, s = 5):
         pygame.display.update()
         clock.tick(FPS)
 
-################### EVENT FUNCTIONS ############################################################
+################################################################################
+################### EVENT FUNCTIONS ############################################
+################################################################################
+
 def manage_events(screen, highlight = False, report = False):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
     if report:
@@ -39,7 +44,7 @@ def manage_events(screen, highlight = False, report = False):
         highlight_threshold(screen, mpos)
         highlight_zone(screen, mpos)
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_q):
             pygame.quit()
             sys.exit
         if event.type == pygame.KEYDOWN:
@@ -57,10 +62,13 @@ def highlight_threshold(screen, mpos):
             for c in Collection.TG[mpos]:
                 Cell.C[c].draw(screen, drawing_type = "graph", color = tomato)
 
-################### SEARCH FUNCTIONS ############################################################
+################################################################################
+################### SEARCH FUNCTIONS ###########################################
+################################################################################
+
 def search(a, b, g, screen):
     if a.zone == b.zone:
-        ZS = zone_search((a.x, a.y), (b.x, b.y))
+        ZS = zone_search((a.x, a.y), (b.x, b.y), a, b)
         if ZS.path is not None and len(ZS.path) > 1:
             ZS.draw_route(screen, color = red)
             a.move(ZS.path[1])
@@ -69,13 +77,12 @@ def search(a, b, g, screen):
     elif a.zone != b.zone:
         S = threshold_search(a, b, g)
         if S.path is not None:
-            S.draw_route(screen, color = darkgrey)
-            if len(S.path) > 1:
-                ZS = zone_search(S.path[0], S.path[1])
-                if ZS.path is not None:
-                    ZS.draw_route(screen, color = red)
-                    a.move(ZS.path[1])
-                    ZS.path.pop(0)
+            S.draw_route(screen, color = lightgrey)
+            ZS = zone_search(S.path[0], S.path[1], a, b)
+            if ZS.path is not None:
+                ZS.draw_route(screen, color = red)
+                a.move(ZS.path[1])
+                ZS.path.pop(0)
 
 def threshold_search(a, b, g):
     a = a.x, a.y
@@ -86,18 +93,26 @@ def threshold_search(a, b, g):
         g[b] = [i for i in Collection.Z[Cell.C[b].zone].threshold_cells]
     return Search(a, b, graph = g)
 
-def zone_search(a, b):
+def zone_search(a, b, act, tar):
     zone = get_zone(a, b)
-    return Search(a, b, graph = Collection.Z[zone].graph)
+    if zone is None:
+        print("Valid zone was not returned!")
+    ignore = set()
+    for actor in Collection.Z[zone].actors:
+        if actor != act.name and actor!= tar.name:
+            ignore = ignore.union(Actor.A[actor].personal_space)
+
+    return Search(a, b, graph = Collection.Z[zone].graph, ignore = ignore)
 
 def get_zone(start, target):
     if not Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
         if Cell.C[start].zone is not None:
             return Cell.C[start].zone
-        if Cell.C[target].zone is not None:
+        elif Cell.C[start].zone is None and Cell.C[target].zone is not None:
             return Cell.C[target].zone
         else:
             return list(Cell.C[start].zones.intersection(Cell.C[target].zones))[0]
+
     elif Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
         if Cell.C[start].zone is not None:
             return Cell.C[start].zone
@@ -112,7 +127,10 @@ def conduct_searches(screen):
     for i in range(s):
         search(Actor.A[str(a[i])], Actor.A[str(t[i])], tg, screen)
 
-############################################# ACTOR FUNCTIONS ########################################
+################################################################################
+################### ACTOR FUNCTIONS ############################################
+################################################################################
+
 def make_actors(n):
     available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
     c = 0
@@ -126,6 +144,9 @@ def reset_actor_positions():
         new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
         Actor.A[a].move(new_pos)
 
-###################################### RUN ##################################################
+################################################################################
+###################### RUN #####################################################
+################################################################################
+
 if __name__ == "__main__":
     run("cardio_alt.png", s = 7)

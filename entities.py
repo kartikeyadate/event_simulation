@@ -1,12 +1,15 @@
+#!/usr/bin/python3.5 
+#entities.py This file contains class definitions for the Cell, Collection, Actor and Search
+
 import sys, time, math, random, heapq, pygame, copy, itertools
 from PIL import Image
 from operator import itemgetter
 from collections import defaultdict
 from colors import *
 
-######################################################################################
-#######################CLASSES DESCRIBING SPACE: CELL, COLLECTION#####################
-######################################################################################
+################################################################################
+#######################CLASSES DESCRIBING SPACE: CELL, COLLECTION###############
+################################################################################
 
 class Cell(object):
     """
@@ -55,9 +58,16 @@ class Cell(object):
 
     def __repr__(self):
         if self.in_threshold:
-            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + '); In threshold ' + str(self.threshold) + "; Adjacent Zones : " + ', '.join([str(i) for i in self.zones])
+            return "Location: " + '('+str(self.x)\
+            + ', ' + str(self.y) + '); In threshold '\
+            + str(self.threshold) + "; Adjacent Zones : "\
+            + ', '.join([str(i) for i in self.zones])
         if self.in_zone:
-            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + '); In zone ' + str(self.zone) + "; Adjacent thresholds: " + ', '.join([str(i) for i in Collection.Z[self.zone].thresholds])
+            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + '); In zone '\
+            + str(self.zone) + "; Adjacent thresholds: "\
+            + ', '.join([str(i) for i in Collection.Z[self.zone].thresholds])\
+            + "; Actors: "\
+            + ', '.join([str(i) for i in Collection.Z[self.zone].actors])
         if not self.in_zone and not self.in_threshold:
             return "Location: " + '('+str(self.x) + ', ' + str(self.y) + ')'
 
@@ -222,7 +232,7 @@ class Collection(object):
         if self.TYPE == "t":
             return "Type: " + self.TYPE + '; ID: ' + self.ID + "; Zones: " + ', '.join([i for i in self.zones])
         elif self.TYPE == "z":
-            return "Type: " + self.TYPE + '; ID: ' + self.ID + "; Thresholds: " + ', '.join([i for i in self.thresholds])
+            return "Type: " + self.TYPE + '; ID: ' + self.ID + "; Thresholds: " + ', '.join([i for i in self.thresholds]) + "; Actors: " + ', '.join([i for i in self.actors])
 
     def create_zone_graph(self):
         all_cells = self.cells.union(self.threshold_cells)
@@ -282,7 +292,7 @@ class Collection(object):
 
         num = 0
         while len(threshold_cells) > 0:
-            cells = Collection.alt_collect(threshold_cells)
+            cells = Collection.collect(threshold_cells)
             threshold = Collection(str(num), "t")
             threshold.cells = cells
             for cell in threshold.cells:
@@ -406,11 +416,11 @@ class Collection(object):
                     cwb[b] = cwb[b].union(cwb[a])
                     rem.add(a)
 
-#        print(len(set(Collection.Z.keys())))
+        #print(len(set(Collection.Z.keys())))
         #print(len(rem))
         for k in rem:
             del Collection.Z[k]
-#        print(len(set(Collection.Z.keys())))
+        #print(len(set(Collection.Z.keys())))
 
         #Work on Thresholds
         cwb = dict()
@@ -435,11 +445,11 @@ class Collection(object):
                     rem.add(a)
 
 
-#        print(len(Collection.T.keys()))
+        #print(len(Collection.T.keys()))
         #print(len(rem))
         for k in rem:
             del Collection.T[k]
-#        print(len(set(Collection.T.keys())))
+        #print(len(set(Collection.T.keys())))
 
         #Update the zone and threshold status of each cell in each zone and threshold.
         for z in Collection.Z.keys():
@@ -458,8 +468,10 @@ class Collection(object):
 
         #So far, we have organized all the cells in the space into thresholds and zones.
         #Next, we have to store the thresholds neighbouring each zone.
-        #All neighbouring cells of a cell in zone which are threshold_cells need not constitute all the threshold cells in the zone.
-        #So, use the threshold_cell found to identify the threshold. The use threshold.cells to find all threshold cells.
+        #All neighbouring cells of a cell in zone which are threshold_cells
+        #need not constitute all the threshold cells in the zone.
+        #So, use the threshold_cell found to identify the threshold.
+        #The use threshold.cells to find all threshold cells.
 
         for z in Collection.Z.keys():
             for c in Collection.Z[z].cells:
@@ -508,9 +520,9 @@ class Collection(object):
             Collection.Z[z].create_zone_graph()
 
 
-######################################################################################
-#######################CLASSES DESCRIBING ACTORS: ACTOR, COCKROACHES #################
-######################################################################################
+################################################################################
+#######################CLASSES DESCRIBING ACTORS: ACTOR, COCKROACHES ###########
+################################################################################
 
 class Actor(object):
     A = dict()
@@ -519,9 +531,11 @@ class Actor(object):
         self.x = x
         self.y = y
         self.color = color
+        self.personal_space = set()
         if zone is not None:
             self.initialize_in_zone(zone)
         self.zone = zone
+        Collection.Z[self.zone].actors.add(self.name)
         self.color = color if color is not None else crimson
         self.threshold = threshold
         self.facing = facing
@@ -533,28 +547,30 @@ class Actor(object):
         ox, oy = self.x, self.y
         self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
         self.zone = Cell.C[(self.x, self.y)].zone
+        self.set_personal_space()
         if ox is not None and oy is not None:
             Cell.C[(ox, oy)].is_occupied = False
         Cell.C[(self.x, self.y)].is_occupied = True
-
-        for c in Cell.C[(self.x, self.y)].nbrs:
-            if not Cell.C[c].is_barrier:
-                if Cell.C[c].in_threshold or Cell.C[c].in_zone:
-                    Cell.C[c].is_personal = True
+        self.set_personal_space()
 
     def remove_personal_space(self):
         for c in Cell.C[(self.x, self.y)].nbrs:
             if not Cell.C[c].is_barrier:
                 if Cell.C[c].in_threshold or Cell.C[c].in_zone:
                     Cell.C[c].is_personal = False
+                    if c in self.personal_space:
+                        self.personal_space.remove(c)
+
 
     def set_personal_space(self):
         for c in Cell.C[(self.x, self.y)].nbrs:
             if not Cell.C[c].is_barrier:
                 if Cell.C[c].in_threshold or Cell.C[c].in_zone:
                     Cell.C[c].is_personal = True
+                    self.personal_space.add(c)
 
     def move(self, c):
+        """ Moves actor from current position to a new position c """
         ox, oy = self.x, self.y
         cx, cy = c
         if not Cell.C[(cx, cy)].is_occupied:
@@ -563,16 +579,20 @@ class Actor(object):
             self.set_personal_space()
             Cell.C[(ox, oy)].is_occupied = False
             Cell.C[(self.x, self.y)].is_occupied = True
+            old_z = Cell.C[(ox, oy)].zone
             self.zone = Cell.C[(self.x, self.y)].zone
+            if old_z != self.zone:
+                if self.zone is not None:
+                    Collection.Z[self.zone].actors.add(self.name)
+                if old_z is not None and self.name in Collection.Z[old_z].actors:
+                    Collection.Z[old_z].actors.remove(self.name)
 
     def draw(self, screen, min_size = 4):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
         radius = max(min_size, int(Cell.size/2))
         pygame.draw.circle(screen, self.color, center, radius)
-        for c in Cell.C[(self.x, self.y)].nbrs:
-            if not Cell.C[c].is_barrier:
-                if Cell.C[c].in_threshold or Cell.C[c].in_zone:
-                    Cell.C[c].draw(screen, drawing_type = "graph", color = gold)
+        for c in self.personal_space:
+            Cell.C[c].draw(screen, drawing_type = "graph", color = gold)
 
     @staticmethod
     def draw_all_actors(screen, min_size = 4):
@@ -607,7 +627,6 @@ class PriorityQueue:
 
     def get(self):
         return heapq.heappop(self.elements)[1]
-
     def length(self):
         return len(self.elements)
 
@@ -616,7 +635,7 @@ class PriorityQueue:
 
 
 class Search:
-    def __init__(self, start, goal, graph = None, threshold = None):
+    def __init__(self, start, goal, graph = None, threshold = None, ignore = set()):
         self.start = start
         self.goal = goal
         self.graph = graph
@@ -624,8 +643,8 @@ class Search:
         self.open_cells = PriorityQueue()
         self.came_from = dict()
         self.cost_so_far = dict()
+        self.ignore = ignore
         self.path = self.get_path()
-
     def min_cost(self, a, b):
         x1, y1 = a
         x2, y2 = b
@@ -647,8 +666,9 @@ class Search:
                 break
             #Avoid occupied cells.
             neighbours = (i for i in self.graph[current] if not Cell.C[i].is_occupied)
+            neighbours = (i for i in neighbours if not i in self.ignore)
             #Avoid infested cells.
-#            neighbours = (i for i in neighbours if Cockroach.Poison[i] <= self.threshold)
+            #Neighbours = (i for i in neighbours if Cockroach.Poison[i] <= self.threshold)
             if neighbours is not None:
                 for loc in neighbours:
                     new_cost = self.cost_so_far[current] + self.min_cost(current, loc)
