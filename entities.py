@@ -538,6 +538,8 @@ class Actor(object):
         Collection.Z[self.zone].actors.add(self.name)
         self.color = color if color is not None else crimson
         self.threshold = threshold
+        if self.threshold is not None:
+            Collection.T[self.threshold].actors.add(self.name)
         self.facing = facing
         Actor.A[self.name] = self
         Cell.C[(self.x, self.y)].is_occupied = True
@@ -581,11 +583,23 @@ class Actor(object):
             Cell.C[(self.x, self.y)].is_occupied = True
             old_z = Cell.C[(ox, oy)].zone
             self.zone = Cell.C[(self.x, self.y)].zone
+            # To do: Treat thresholds the same way as zones are treated.
+            # Create a global list of threshold cells which are personal and ignore them during the threshold search.
+            # update the zone's information about the actors in it.
             if old_z != self.zone:
                 if self.zone is not None:
                     Collection.Z[self.zone].actors.add(self.name)
                 if old_z is not None and self.name in Collection.Z[old_z].actors:
                     Collection.Z[old_z].actors.remove(self.name)
+
+            # update the threshold's information about the actors in it.
+            old_t = Cell.C[(ox, oy)].threshold
+            self.threshold = Cell.C[(self.x, self.y)].threshold
+            if old_t != self.threshold:
+                if self.threshold is not None:
+                    Collection.T[self.threshold].actors.add(self.name)
+                if old_t is not None and self.name is Collection.T[old_t].actors:
+                    Collection.T[old_t].actors.remove(self.name)
 
     def draw(self, screen, min_size = 4):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
@@ -639,7 +653,7 @@ class Search:
         self.start = start
         self.goal = goal
         self.graph = graph
-        self.threshold = threshold
+        self.threshold = threshold #the name of this element of the search object should be changed. Could be confused with the space element threshold.
         self.open_cells = PriorityQueue()
         self.came_from = dict()
         self.cost_so_far = dict()

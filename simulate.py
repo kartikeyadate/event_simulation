@@ -85,13 +85,26 @@ def search(a, b, g, screen):
                 ZS.path.pop(0)
 
 def threshold_search(a, b, g):
-    a = a.x, a.y
-    b = b.x, b.y
-    if a not in g:
-        g[a] = [i for i in Collection.Z[Cell.C[a].zone].threshold_cells]
-    if b not in g:
-        g[b] = [i for i in Collection.Z[Cell.C[b].zone].threshold_cells]
-    return Search(a, b, graph = g)
+    A = a.x, a.y
+    B = b.x, b.y
+
+    ignore = set()
+    for actor in Actor.A.keys():
+        if actor != a.name and actor != b.name:
+            if Actor.A[actor].threshold is not None:
+                ignore = ignore.union(Actor.A[actor].personal_space)
+            if Actor.A[actor].zone is not None:
+                z = Actor.A[actor].zone
+                intersect = Actor.A[actor].personal_space.intersection(Collection.Z[z].threshold_cells)
+                if len(intersect) > 0:
+                    ignore = ignore.union(intersect)
+
+
+    if A not in g:
+        g[A] = [i for i in Collection.Z[Cell.C[A].zone].threshold_cells]
+    if B not in g:
+        g[B] = [i for i in Collection.Z[Cell.C[B].zone].threshold_cells]
+    return Search(A, B, graph = g, ignore = ignore)
 
 def zone_search(a, b, act, tar):
     zone = get_zone(a, b)
