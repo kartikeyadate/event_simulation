@@ -17,17 +17,20 @@ def run(img, s = 5):
     screen = pygame.display.set_mode((w, h))  # create screen
     Collection.generate_zones_and_thresholds()
     background = pygame.image.load(img).convert()
-    make_actors(50)
+    make_actors(10)
+    joe = Actor("joe", zone = "66", color = teal)
+    target = Actor("target", x = 38, y = 10, zone = "13", color = black)
     tf = 0
+    g = Collection.TG
     while True:
         tf += 1
-        screen.fill(white)
-        #screen.blit(background,(0,0))
-        conduct_searches(screen)
+        screen.fill(white) #screen.blit(background,(0,0))
+        #conduct_searches(screen)
+        Move(joe, target, screen, graph = g)
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
         Actor.draw_all_actors(screen, min_size = 5)
-        manage_events(screen, highlight = True, report = False)
+        manage_events(screen, highlight = True, report = True)
         pygame.display.update()
         clock.tick(FPS)
 
@@ -77,7 +80,7 @@ def search(a, b, g, screen):
     elif a.zone != b.zone:
         S = threshold_search(a, b, g)
         if S.path is not None:
-            S.draw_route(screen, color = lightgrey)
+            S.draw_route(screen, color = verylightgrey)
             ZS = zone_search(S.path[0], S.path[1], a, b)
             if ZS.path is not None:
                 ZS.draw_route(screen, color = red)
@@ -98,7 +101,6 @@ def threshold_search(a, b, g):
                 intersect = Actor.A[actor].personal_space.intersection(Collection.Z[z].threshold_cells)
                 if len(intersect) > 0:
                     ignore = ignore.union(intersect)
-
 
     if A not in g:
         g[A] = [i for i in Collection.Z[Cell.C[A].zone].threshold_cells]

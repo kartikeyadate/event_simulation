@@ -1,6 +1,5 @@
 #!/usr/bin/python3.5 
-#entities.py This file contains class definitions for the Cell, Collection, Actor and Search
-
+#entities.py This file contains class definitions for the Cell, Collection, Actor and Search 
 import sys, time, math, random, heapq, pygame, copy, itertools
 from PIL import Image
 from operator import itemgetter
@@ -235,6 +234,9 @@ class Collection(object):
             return "Type: " + self.TYPE + '; ID: ' + self.ID + "; Thresholds: " + ', '.join([i for i in self.thresholds]) + "; Actors: " + ', '.join([i for i in self.actors])
 
     def create_zone_graph(self):
+        """
+        Create a cell-neighbour graph.
+        """
         all_cells = self.cells.union(self.threshold_cells)
         for c in all_cells:
             self.graph[c] = [i for i in Cell.C[c].nbrs if i in all_cells and not Cell.C[i].is_barrier]
@@ -255,6 +257,9 @@ class Collection(object):
 
     @staticmethod
     def draw_everything(screen, color = None):
+        """
+        Draws all zones.
+        """
         for z in Collection.Z:
             for c in Collection.Z[z].cells:
                 if color is None:
@@ -416,13 +421,9 @@ class Collection(object):
                     cwb[b] = cwb[b].union(cwb[a])
                     rem.add(a)
 
-        #print(len(set(Collection.Z.keys())))
-        #print(len(rem))
         for k in rem:
             del Collection.Z[k]
-        #print(len(set(Collection.Z.keys())))
 
-        #Work on Thresholds
         cwb = dict()
         for t in Collection.T.keys():
             cells = Collection.T[t].cells
@@ -444,14 +445,9 @@ class Collection(object):
                     cwb[b] = cwb[b].union(cwb[a])
                     rem.add(a)
 
-
-        #print(len(Collection.T.keys()))
-        #print(len(rem))
         for k in rem:
             del Collection.T[k]
-        #print(len(set(Collection.T.keys())))
 
-        #Update the zone and threshold status of each cell in each zone and threshold.
         for z in Collection.Z.keys():
             for c in Collection.Z[z].cells:
                 Cell.C[c].in_zone = True
@@ -525,8 +521,11 @@ class Collection(object):
 ################################################################################
 
 class Actor(object):
+    """
+    Definition of the actor.
+    """
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0)):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), profile = dict()):
         self.name = name
         self.x = x
         self.y = y
@@ -541,10 +540,14 @@ class Actor(object):
         if self.threshold is not None:
             Collection.T[self.threshold].actors.add(self.name)
         self.facing = facing
+        self.profile = profile
         Actor.A[self.name] = self
         Cell.C[(self.x, self.y)].is_occupied = True
 
     def initialize_in_zone(self, z):
+        """
+        If a zone is specified, this initializes the actor in a randomly chosen position in this zone.
+        """
         options = set(Collection.Z[z].cells)
         ox, oy = self.x, self.y
         self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
@@ -556,6 +559,9 @@ class Actor(object):
         self.set_personal_space()
 
     def remove_personal_space(self):
+        """
+        Removes the personal space of the actor in the current position.
+        """
         for c in Cell.C[(self.x, self.y)].nbrs:
             if not Cell.C[c].is_barrier:
                 if Cell.C[c].in_threshold or Cell.C[c].in_zone:
@@ -565,6 +571,10 @@ class Actor(object):
 
 
     def set_personal_space(self):
+        """
+        Sets the personal space of the actor in current position.
+        Currently, personal space is the von Neumann neighbourhood of the current position.
+        """
         for c in Cell.C[(self.x, self.y)].nbrs:
             if not Cell.C[c].is_barrier:
                 if Cell.C[c].in_threshold or Cell.C[c].in_zone:
@@ -572,7 +582,9 @@ class Actor(object):
                     self.personal_space.add(c)
 
     def move(self, c):
-        """ Moves actor from current position to a new position c """
+        """
+        Moves actor from current position to a new position c
+        """
         ox, oy = self.x, self.y
         cx, cy = c
         if not Cell.C[(cx, cy)].is_occupied:
@@ -583,8 +595,7 @@ class Actor(object):
             Cell.C[(self.x, self.y)].is_occupied = True
             old_z = Cell.C[(ox, oy)].zone
             self.zone = Cell.C[(self.x, self.y)].zone
-            # To do: Treat thresholds the same way as zones are treated.
-            # Create a global list of threshold cells which are personal and ignore them during the threshold search.
+
             # update the zone's information about the actors in it.
             if old_z != self.zone:
                 if self.zone is not None:
@@ -602,6 +613,10 @@ class Actor(object):
                     Collection.T[old_t].actors.remove(self.name)
 
     def draw(self, screen, min_size = 4):
+        """
+        Draws this object in pygame as a circle or radius min_size
+        Requires a screen object.
+        """
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
         radius = max(min_size, int(Cell.size/2))
         pygame.draw.circle(screen, self.color, center, radius)
@@ -610,6 +625,11 @@ class Actor(object):
 
     @staticmethod
     def draw_all_actors(screen, min_size = 4):
+        """
+        Draws all actors in the Actor.A dictionary.
+        Requires a screen object.
+        The minimum size of each actor can be specified in min_size.
+        """
         for a in Actor.A:
             Actor.A[a].draw(screen, min_size = min_size)
 
@@ -626,9 +646,10 @@ class Actor(object):
 ################################################################################
 
 class PriorityQueue:
-    """A wrapper class around python's heapq class.
-       An instance of this class
-       is used to store the list of open cells."""
+    """
+    A wrapper class around python's heapq class.
+    An instance of this class is used to store the list of open cells.
+    """
 
     def __init__(self):
         self.elements = []
@@ -647,8 +668,16 @@ class PriorityQueue:
     def printqueue(self):
         print(self.elements)
 
-
 class Search:
+    """
+    A definition of the A* search algorithm.
+    Based on Amit Patel's implementation at Red Blob Games.
+    http://www-cs-students.stanford.edu/~amitp/gameprog.html
+    Is used to conduct the threshold and zone searches in Move.
+    start: a tuple (x, y)
+    goal: a tuple (x, y)
+    graph: A dictionary of each node and its neighbours
+    """
     def __init__(self, start, goal, graph = None, threshold = None, ignore = set()):
         self.start = start
         self.goal = goal
@@ -659,7 +688,12 @@ class Search:
         self.cost_so_far = dict()
         self.ignore = ignore
         self.path = self.get_path()
+
     def min_cost(self, a, b):
+        """
+        Returns the smallest distance between cells a and b.
+        Orthogonals and diagonals are considered.
+        """
         x1, y1 = a
         x2, y2 = b
         if abs(y2 - y1) > abs(x2 - x1):
@@ -670,6 +704,12 @@ class Search:
             return 1.4142 * abs(y2 - y1)
 
     def get_path(self):
+        """
+        Returns a list of cells which is the shortest path between the start and the goal.
+        If a path is not available, returns None.
+        Ignores cells in the ignore set if specified.
+        Ignores occupied cells.
+        """
         self.open_cells.put(self.start, 0)
         self.came_from[self.start] = None
         self.cost_so_far[self.start] = 0
@@ -694,6 +734,12 @@ class Search:
         return self.build_path()
 
     def build_path(self):
+        """
+        Returns a path in the form of a list of cells.
+        Is used at the end of the get_path method.
+        If private functions were possible, this would be one.
+        Returns None if a path is not available.
+        """
         path = list()
         goal_nbrs = self.graph[self.goal]
         if self.goal in self.came_from.keys():
@@ -715,6 +761,96 @@ class Search:
             return None
 
     def draw_route(self, screen, color = white):
+        """
+        Draws the path, if available in self.path in pygame.
+        Requires a screen object as argument.
+        The color of the line can be specified in the color keyword argument.
+        """
         draw_this = [Cell.C[p].rect.center for p in self.path]
         if len(draw_this) > 1:
             pygame.draw.lines(screen, color, False, draw_this, 1)
+
+######################################################################################################
+###################################### EVENT CLASSES #################################################
+
+class Move:
+    def __init__(self, actor, target, screen, graph = dict()):
+        self.actor = actor
+        self.target = target
+        self.screen = screen
+        self.graph = graph
+        self.go()
+
+    def go(self):
+        if self.actor.zone == self.target.zone:
+            ZS = self.zone_search((self.actor.x, self.actor.y), (self.target.x, self.target.y))
+            if ZS.path is not None and len(ZS.path) > 1:
+                ZS.draw_route(self.screen, color = red)
+                self.actor.move(ZS.path[1])
+                ZS.path.pop(0)
+
+        elif self.actor.zone != self.target.zone:
+            S = self.threshold_search()
+            if S.path is not None:
+                S.draw_route(self.screen, color = verylightgrey)
+                ZS = self.zone_search(S.path[0], S.path[1])
+                if ZS.path is not None:
+                    ZS.draw_route(self.screen, color = red)
+                    self.actor.move(ZS.path[1])
+                    ZS.path.pop(0)
+
+    def threshold_search(self):
+        A = self.actor.x, self.actor.y
+        B = self.target.x, self.target.y
+
+        ignore = set()
+        for actor in Actor.A.keys():
+            if actor != self.actor.name and actor != self.target.name:
+                if Actor.A[actor].threshold is not None:
+                    ignore = ignore.union(Actor.A[actor].personal_space)
+                if Actor.A[actor].zone is not None:
+                    z = Actor.A[actor].zone
+                    intersect = Actor.A[actor].personal_space.intersection(Collection.Z[z].threshold_cells)
+                    if len(intersect) > 0:
+                        ignore = ignore.union(intersect)
+
+        if A not in self.graph:
+            self.graph[A] = [i for i in Collection.Z[Cell.C[A].zone].threshold_cells]
+        if B not in self.graph:
+            self.graph[B] = [i for i in Collection.Z[Cell.C[B].zone].threshold_cells]
+
+        return Search(A, B, graph = self.graph, ignore = ignore)
+
+    def zone_search(self, a, b):
+        zone = self.get_zone(a, b)
+        if zone is None:
+            print("Valid zone was not returned!")
+        ignore = set()
+        for actor in Collection.Z[zone].actors:
+            if actor != self.actor.name and actor!= self.target.name:
+                ignore = ignore.union(Actor.A[actor].personal_space)
+
+        return Search(a, b, graph = Collection.Z[zone].graph, ignore = ignore)
+
+    def get_zone(self, start, target):
+        if not Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
+            if Cell.C[start].zone is not None:
+                return Cell.C[start].zone
+            elif Cell.C[start].zone is None and Cell.C[target].zone is not None:
+                return Cell.C[target].zone
+            else:
+                return list(Cell.C[start].zones.intersection(Cell.C[target].zones))[0]
+
+        elif Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
+            if Cell.C[start].zone is not None:
+                return Cell.C[start].zone
+            if Cell.C[target].zone is not None:
+                return Cell.C[target].zone
+
+
+class Meet:
+    def __init__(self, actors = set(), zones = set(), duration = set(), end_conditions = set()):
+        self.actors = actors
+        self.zones = zones
+        self.duration = duration
+        self.end_conditions = end_conditions
