@@ -15,10 +15,11 @@ def run(img, s = 5):
     w, h = Cell.create_space_from_plan(s, img) #Create a dictionary of all cells.
     print("Created space consisting of ", len(Cell.C), "cells.")
     screen = pygame.display.set_mode((w, h))  # create screen
+    pygame.display.set_caption("IDEALIZED HOSPITAL WARD")
     Collection.generate_zones_and_thresholds()
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
-    make_actors(20)
+    make_actors(40)
     tf = 0
     v_num = 0
     g = Collection.TG
@@ -26,7 +27,7 @@ def run(img, s = 5):
         tf += 1
         screen.fill(white) #screen.blit(background,(0,0))
         conduct_searches(screen)
-        v_num = spawn_visitors(v_num, tf, g, target, screen, interval = range(5, 60))
+        v_num = spawn_visitors(v_num, tf, g, target, screen, start_in = "65", interval = range(5, 60), unavailable = {"21", "31", "33", "47"})
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
         Actor.draw_all_actors(screen, min_size = 5)
@@ -37,7 +38,6 @@ def run(img, s = 5):
 ################################################################################
 ################### EVENT FUNCTIONS ############################################
 ################################################################################
-
 def manage_events(screen, highlight = False, report = False):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
     if report:
@@ -57,7 +57,8 @@ def manage_events(screen, highlight = False, report = False):
 def highlight_zone(screen, mpos):
     for z in Collection.Z:
         if mpos in Collection.Z[z].cells:
-            Collection.Z[z].draw(screen, color = steelblue)
+            #Collection.Z[z].draw(screen, color = powderblue)
+            label(screen, z)
 
 def highlight_threshold(screen, mpos):
     for t in Collection.T:
@@ -65,82 +66,21 @@ def highlight_threshold(screen, mpos):
             for c in Collection.TG[mpos]:
                 Cell.C[c].draw(screen, drawing_type = "graph", color = tomato)
 
+def label(screen, z):
+    f = pygame.font.SysFont("monospace", 12)
+    l = f.render(Collection.Z[z].ID, True, (10, 10, 10))
+    screen.blit(l, Collection.Z[z].center)
+
 ################################################################################
 ################### SEARCH FUNCTIONS ###########################################
 ################################################################################
-
-def search(a, b, g, screen):
-    if a.zone == b.zone:
-        ZS = zone_search((a.x, a.y), (b.x, b.y), a, b)
-        if ZS.path is not None and len(ZS.path) > 1:
-            ZS.draw_route(screen, color = red)
-            a.move(ZS.path[1])
-            ZS.path.pop(0)
-
-    elif a.zone != b.zone:
-        S = threshold_search(a, b, g)
-        if S.path is not None:
-            S.draw_route(screen, color = verylightgrey)
-            ZS = zone_search(S.path[0], S.path[1], a, b)
-            if ZS.path is not None:
-                ZS.draw_route(screen, color = red)
-                a.move(ZS.path[1])
-                ZS.path.pop(0)
-
-def threshold_search(a, b, g):
-    A = a.x, a.y
-    B = b.x, b.y
-
-    ignore = set()
-    for actor in Actor.A.keys():
-        if actor != a.name and actor != b.name:
-            if Actor.A[actor].threshold is not None:
-                ignore = ignore.union(Actor.A[actor].personal_space)
-            if Actor.A[actor].zone is not None:
-                z = Actor.A[actor].zone
-                intersect = Actor.A[actor].personal_space.intersection(Collection.Z[z].threshold_cells)
-                if len(intersect) > 0:
-                    ignore = ignore.union(intersect)
-
-    if A not in g:
-        g[A] = [i for i in Collection.Z[Cell.C[A].zone].threshold_cells]
-    if B not in g:
-        g[B] = [i for i in Collection.Z[Cell.C[B].zone].threshold_cells]
-    return Search(A, B, graph = g, ignore = ignore)
-
-def zone_search(a, b, act, tar):
-    zone = get_zone(a, b)
-    if zone is None:
-        print("Valid zone was not returned!")
-    ignore = set()
-    for actor in Collection.Z[zone].actors:
-        if actor != act.name and actor!= tar.name:
-            ignore = ignore.union(Actor.A[actor].personal_space)
-
-    return Search(a, b, graph = Collection.Z[zone].graph, ignore = ignore)
-
-def get_zone(start, target):
-    if not Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
-        if Cell.C[start].zone is not None:
-            return Cell.C[start].zone
-        elif Cell.C[start].zone is None and Cell.C[target].zone is not None:
-            return Cell.C[target].zone
-        else:
-            return list(Cell.C[start].zones.intersection(Cell.C[target].zones))[0]
-
-    elif Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
-        if Cell.C[start].zone is not None:
-            return Cell.C[start].zone
-        if Cell.C[target].zone is not None:
-            return Cell.C[target].zone
-
 def conduct_searches(screen):
     a = [i for i in Actor.A.keys() if i.isdigit() and int(i) % 2 != 0]
     t = [i for i in Actor.A.keys() if i.isdigit() and int(i) % 2 == 0]
     s = min(len(a), len(t))
     tg = Collection.TG
     for i in range(s):
-        search(Actor.A[str(a[i])], Actor.A[str(t[i])], tg, screen)
+        Move(Actor.A[str(a[i])], Actor.A[str(t[i])], screen, graph = tg)
 
 ################################################################################
 ################### ACTOR FUNCTIONS ############################################
@@ -159,7 +99,7 @@ def reset_actor_positions():
             new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
             Actor.A[a].move(new_pos)
 
-def spawn_visitors(num, tf, graph, target, screen, interval = range(5, 25)):
+def spawn_visitors(num, tf, graph, target, screen, start_in = None, interval = range(5, 25), unavailable = set()):
     """
     Spawns visitors at time interval interval measured by time frame tf.
     Visitors are actors identified with a "v" as the last character in their alphanumeric name.
@@ -168,8 +108,9 @@ def spawn_visitors(num, tf, graph, target, screen, interval = range(5, 25)):
     inter = random.choice(interval)
     if tf % inter == 0:
         v_name = str(num) + "v"
-        Actor(v_name, zone = "66", color = teal)
+        Actor(v_name, zone = start_in, color = teal)
         num += 1
+
     done = set()
     for actor in Actor.A.keys():
         if actor[-1] == "v":
@@ -183,9 +124,10 @@ def spawn_visitors(num, tf, graph, target, screen, interval = range(5, 25)):
     #print("Actor dictionary has: ", list(Actor.A.keys()))
     for actor in Actor.A.keys():
         if actor[-1] == "v":
-            Move(Actor.A[actor], target, screen, graph = graph)
+            Move(Actor.A[actor], target, screen, graph = graph, unavailable = unavailable)
 
     return num
+
 ################################################################################
 ###################### RUN #####################################################
 ################################################################################

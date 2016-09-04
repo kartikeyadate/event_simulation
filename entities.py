@@ -215,6 +215,7 @@ class Collection(object):
         self.ID = ID
         self.TYPE = TYPE
         self.cells = set() #keys (x,y) of cells in collection
+        self.center = None
         self.graph = dict() #search graph for a zone.
         self.thresholds = set() #thresholds attached to current zone.
         self.threshold_cells = set() #keys (x,y) of cells contained in thresholds attached to current zone.
@@ -240,6 +241,11 @@ class Collection(object):
         all_cells = self.cells.union(self.threshold_cells)
         for c in all_cells:
             self.graph[c] = [i for i in Cell.C[c].nbrs if i in all_cells and not Cell.C[i].is_barrier]
+        xs = [i[0] for i in self.cells]
+        ys = [i[1] for i in self.cells]
+        xmid = int(0.5*(max(xs) + min(xs)))
+        ymid = int(0.5*(max(ys) + min(ys)))
+        self.center = (xmid*Cell.size, ymid*Cell.size)
 
     def draw(self, screen, color = None):
         """Draw this collection"""
@@ -635,7 +641,7 @@ class Actor(object):
         radius = max(min_size, int(Cell.size/2))
         pygame.draw.circle(screen, self.color, center, radius)
         for c in self.personal_space:
-            Cell.C[c].draw(screen, drawing_type = "graph", color = gold)
+            Cell.C[c].draw(screen, drawing_type = "graph", color = tomato)
 
     @staticmethod
     def draw_all_actors(screen, min_size = 4):
@@ -814,11 +820,12 @@ class Search:
 ###################################### EVENT CLASSES #################################################
 
 class Move:
-    def __init__(self, actor, target, screen, graph = dict()):
+    def __init__(self, actor, target, screen, graph = dict(), unavailable = set()):
         self.actor = actor
         self.target = target
         self.screen = screen
         self.graph = graph
+        self.unavailable = unavailable
         self.done = self.check_done()
         self.go()
 
@@ -848,6 +855,7 @@ class Move:
         B = self.target.x, self.target.y
 
         ignore = set()
+        #Avoid stepping into other actors' personal space.
         for actor in Actor.A.keys():
             if actor != self.actor.name and actor != self.target.name:
                 if Actor.A[actor].threshold is not None:
@@ -857,6 +865,10 @@ class Move:
                     intersect = Actor.A[actor].personal_space.intersection(Collection.Z[z].threshold_cells)
                     if len(intersect) > 0:
                         ignore = ignore.union(intersect)
+        #Avoid using zones which are unavailable.
+        for u in self.unavailable:
+            for c in Collection.Z[u].threshold_cells:
+                ignore.add(c)
 
         if A not in self.graph:
             self.graph[A] = [i for i in Collection.Z[Cell.C[A].zone].threshold_cells]
