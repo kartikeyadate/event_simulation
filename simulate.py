@@ -17,20 +17,20 @@ def run(img, s = 5):
     screen = pygame.display.set_mode((w, h))  # create screen
     Collection.generate_zones_and_thresholds()
     background = pygame.image.load(img).convert()
-    make_actors(10)
-    joe = Actor("joe", zone = "66", color = teal)
-    target = Actor("target", x = 38, y = 10, zone = "13", color = black)
+    target = Actor("target", x = 38, y = 7, zone = "13", color = black)
+    #make_actors(70)
     tf = 0
+    v_num = 0
     g = Collection.TG
     while True:
         tf += 1
         screen.fill(white) #screen.blit(background,(0,0))
         #conduct_searches(screen)
-        Move(joe, target, screen, graph = g)
+        v_num = spawn_visitors(v_num, tf, g, target, screen, interval = range(5, 60))
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
         Actor.draw_all_actors(screen, min_size = 5)
-        manage_events(screen, highlight = True, report = True)
+        manage_events(screen, highlight = True, report = False)
         pygame.display.update()
         clock.tick(FPS)
 
@@ -145,7 +145,6 @@ def conduct_searches(screen):
 ################################################################################
 ################### ACTOR FUNCTIONS ############################################
 ################################################################################
-
 def make_actors(n):
     available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
     c = 0
@@ -159,6 +158,33 @@ def reset_actor_positions():
         new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
         Actor.A[a].move(new_pos)
 
+def spawn_visitors(num, tf, graph, target, screen, interval = range(5, 25)):
+    """
+    Spawns visitors at time interval interval measured by time frame tf.
+    Visitors are actors identified with a "v" as the last character in their alphanumeric name.
+    Visitors move towards their target and die after reaching it.
+    """
+    inter = random.choice(interval)
+    if tf % inter == 0:
+        v_name = str(num) + "v"
+        Actor(v_name, zone = "66", color = teal)
+        num += 1
+    done = set()
+    for actor in Actor.A.keys():
+        if actor[-1] == "v":
+            if (Actor.A[actor].x, Actor.A[actor].y) in Cell.C[(target.x, target.y)].nbrs:
+                done.add(actor)
+
+    for d in done:
+        Actor.A[d].kill()
+        print("Killed", d)
+
+    #print("Actor dictionary has: ", list(Actor.A.keys()))
+    for actor in Actor.A.keys():
+        if actor[-1] == "v":
+            Move(Actor.A[actor], target, screen, graph = graph)
+
+    return num
 ################################################################################
 ###################### RUN #####################################################
 ################################################################################

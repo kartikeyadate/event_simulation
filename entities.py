@@ -1,5 +1,5 @@
 #!/usr/bin/python3.5 
-#entities.py This file contains class definitions for the Cell, Collection, Actor and Search 
+#entities.py This file contains class definitions for the Cell, Collection, Actor, Target, Move, Meet and Search 
 import sys, time, math, random, heapq, pygame, copy, itertools
 from PIL import Image
 from operator import itemgetter
@@ -548,7 +548,7 @@ class Actor(object):
         """
         If a zone is specified, this initializes the actor in a randomly chosen position in this zone.
         """
-        options = set(Collection.Z[z].cells)
+        options = Collection.Z[z].cells
         ox, oy = self.x, self.y
         self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
         self.zone = Cell.C[(self.x, self.y)].zone
@@ -612,6 +612,20 @@ class Actor(object):
                 if old_t is not None and self.name is Collection.T[old_t].actors:
                     Collection.T[old_t].actors.remove(self.name)
 
+    def kill(self):
+        if self.zone is not None:
+            if self.name in Collection.Z[self.zone].actors:
+                Collection.Z[self.zone].actors.remove(self.name)
+
+        if self.threshold is not None:
+            if self.name in Collection.T[self.threshold].actors:
+                Collection.T[self.threshold].actors.remove(self.name)
+
+        Cell.C[(self.x, self.y)].is_occupied = False
+        self.remove_personal_space()
+        del Actor.A[self.name]
+        del self
+
     def draw(self, screen, min_size = 4):
         """
         Draws this object in pygame as a circle or radius min_size
@@ -639,6 +653,32 @@ class Actor(object):
             if Actor.A[a].zone is None:
                 c = Actor.A[a].x, Actor.A[a].y
                 print(Cell.C[c].zones)
+
+class Target:
+    """Defines a target cell. Target cells are not occupied."""
+    T = dict()
+    def __init__(self, name, x = None, y = None, zone = None):
+        self.x = x
+        self.y = y
+        self.name = name
+        self.zone = zone
+        if self.x is None and self.y is None:
+            self.initialize()
+        Target.T[self.name] = self
+
+    def initialize(self):
+        """
+        If a cell location is not specified, initializes in a random cell in given zone.
+        If a zone is not specified, initializes in a randomly chosen zone from available zones.
+        """
+        if self.zone is not None:
+            options = Collection.Z[self.zone].cells
+            ox, oy = self.x, self.y
+            self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
+        elif self.zone is None:
+            possible_zones = [i for i in Collection.Z.keys()]
+            self.zone = random.choice(possible_zones)
+            self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
 
 
 ################################################################################
@@ -779,7 +819,11 @@ class Move:
         self.target = target
         self.screen = screen
         self.graph = graph
+        self.done = self.check_done()
         self.go()
+
+    def check_done(self):
+        return (self.actor.x, self.actor.y) in Cell.C[(self.target.x, self.target.y)].nbrs
 
     def go(self):
         if self.actor.zone == self.target.zone:
