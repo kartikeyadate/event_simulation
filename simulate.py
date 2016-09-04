@@ -18,14 +18,14 @@ def run(img, s = 5):
     Collection.generate_zones_and_thresholds()
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
-    #make_actors(70)
+    make_actors(20)
     tf = 0
     v_num = 0
     g = Collection.TG
     while True:
         tf += 1
         screen.fill(white) #screen.blit(background,(0,0))
-        #conduct_searches(screen)
+        conduct_searches(screen)
         v_num = spawn_visitors(v_num, tf, g, target, screen, interval = range(5, 60))
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
@@ -135,8 +135,8 @@ def get_zone(start, target):
             return Cell.C[target].zone
 
 def conduct_searches(screen):
-    a = [i for i in Actor.A.keys() if int(i) % 2 != 0]
-    t = [i for i in Actor.A.keys() if int(i) % 2 == 0]
+    a = [i for i in Actor.A.keys() if i.isdigit() and int(i) % 2 != 0]
+    t = [i for i in Actor.A.keys() if i.isdigit() and int(i) % 2 == 0]
     s = min(len(a), len(t))
     tg = Collection.TG
     for i in range(s):
@@ -155,8 +155,9 @@ def make_actors(n):
 def reset_actor_positions():
     available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
     for a in Actor.A:
-        new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
-        Actor.A[a].move(new_pos)
+        if a.isdigit():
+            new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
+            Actor.A[a].move(new_pos)
 
 def spawn_visitors(num, tf, graph, target, screen, interval = range(5, 25)):
     """
