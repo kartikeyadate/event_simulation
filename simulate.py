@@ -13,32 +13,33 @@ def run(img, s = 5):
     clock = pygame.time.Clock()
     FPS = 5
     w, h = Cell.create_space_from_plan(s, img) #Create a dictionary of all cells.
+    Collection.generate_zones_and_thresholds()
     print("Created space consisting of ", len(Cell.C), "cells.")
     screen = pygame.display.set_mode((w, h))  # create screen
     pygame.display.set_caption("IDEALIZED HOSPITAL WARD")
-    Collection.generate_zones_and_thresholds()
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
-    make_actors(40)
+    v_name = make_actors(v_name = 0, n = 20, actor_type = "staff")
+    v_name = make_actors(v_name = v_name, actor_type = "nurses", color = green, locations = ((50, 43, "21"), (55, 43, "21"), (60, 43, "21"), (78, 43, "31"), (83, 43, "31"), (88, 43, "31")))
+    v_num = int(v_name)
     tf = 0
-    v_num = 0
     g = Collection.TG
     while True:
         tf += 1
         screen.fill(white) #screen.blit(background,(0,0))
-        conduct_searches(screen)
-        v_num = spawn_visitors(v_num, tf, g, target, screen, start_in = "65", interval = range(5, 60), unavailable = {"21", "31", "33", "47"})
+        conduct_searches(screen, actor_type = "staff")
+        v_num = spawn_actors(v_num, tf, g, target, screen, start_in = "65", interval = range(5, 60), unavailable = {"21", "31", "33"}, actor_type = "visitor")
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
         Actor.draw_all_actors(screen, min_size = 5)
-        manage_events(screen, highlight = True, report = False)
+        manage_io_events(screen, highlight = True, report = True)
         pygame.display.update()
         clock.tick(FPS)
 
 ################################################################################
 ################### EVENT FUNCTIONS ############################################
 ################################################################################
-def manage_events(screen, highlight = False, report = False):
+def manage_io_events(screen, highlight = False, report = False):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
     if report:
         if mpos in Cell.C.keys():
@@ -52,7 +53,7 @@ def manage_events(screen, highlight = False, report = False):
             sys.exit
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                reset_actor_positions()
+                reset_actor_positions(actor_type = "staff")
 
 def highlight_zone(screen, mpos):
     for z in Collection.Z:
@@ -74,9 +75,12 @@ def label(screen, z):
 ################################################################################
 ################### SEARCH FUNCTIONS ###########################################
 ################################################################################
-def conduct_searches(screen):
-    a = [i for i in Actor.A.keys() if i.isdigit() and int(i) % 2 != 0]
-    t = [i for i in Actor.A.keys() if i.isdigit() and int(i) % 2 == 0]
+def conduct_searches(screen, actor_type = None):
+    """
+    Conducts n/2 searches among the population of n actors.
+    """
+    a = [i for i in Actor.A.keys() if actor_type in i and int(i.split("_")[0]) % 2 != 0]
+    t = [i for i in Actor.A.keys() if actor_type in i and int(i.split("_")[0]) % 2 == 0]
     s = min(len(a), len(t))
     tg = Collection.TG
     for i in range(s):
@@ -85,52 +89,79 @@ def conduct_searches(screen):
 ################################################################################
 ################### ACTOR FUNCTIONS ############################################
 ################################################################################
-def make_actors(n):
-    available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
-    c = 0
-    while c < n:
-        Actor(str(c), zone = random.choice(available_zones))
-        c += 1
+def make_actors(v_name = None, n = None, actor_type = None, color = None, locations = None):
+    """
+    Initialize n actors in available zones.
+    """
+    if v_name is None:
+        v_name = 0
+    if n is not None and locations is None:
+        available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
+        while v_name < n:
+            v_name += 1
+            actor_name = str(v_name) + "_" + actor_type
+            Actor(actor_name, zone = random.choice(available_zones), color = color, actor_type = actor_type)
 
-def reset_actor_positions():
+    if n is None and locations is not None:
+        for (x_pos, y_pos, z) in locations:
+            v_name += 1
+            actor_name = str(v_name) + "_" + actor_type
+            Actor(actor_name, x = x_pos, y = y_pos, zone = z, color = color, actor_type = actor_type)
+    return v_name
+
+def reset_actor_positions(actor_type = None):
+    """
+    Resets the positions of all actors in all available zones.
+    An available zone is one which has at least one threshold.
+    """
     available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
     for a in Actor.A:
-        if a.isdigit():
+        if actor_type in a:
             new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
             Actor.A[a].move(new_pos)
 
-def spawn_visitors(num, tf, graph, target, screen, start_in = None, interval = range(5, 25), unavailable = set()):
+def spawn_actors(num, tf, graph, target, screen, start_in = None, interval = range(5, 25), unavailable = set(), actor_type = None):
     """
     Spawns visitors at time interval interval measured by time frame tf.
     Visitors are actors identified with a "v" as the last character in their alphanumeric name.
     Visitors move towards their target and die after reaching it.
     """
+
+    #initialize new actors.
     inter = random.choice(interval)
     if tf % inter == 0:
-        v_name = str(num) + "v"
-        Actor(v_name, zone = start_in, color = teal)
+        v_name = str(num) + "_" + actor_type
+        Actor(v_name, zone = start_in, color = teal, actor_type = actor_type)
         num += 1
 
+    # identify actors who have reached their target.
     done = set()
     for actor in Actor.A.keys():
-        if actor[-1] == "v":
+        if Actor.A[actor].actor_type == actor_type:
             if (Actor.A[actor].x, Actor.A[actor].y) in Cell.C[(target.x, target.y)].nbrs:
                 done.add(actor)
 
+    # destroy actors who have reached their target.
     for d in done:
         Actor.A[d].kill()
         print("Killed", d)
 
-    #print("Actor dictionary has: ", list(Actor.A.keys()))
+    # for all remaining actors, move them towards target.
     for actor in Actor.A.keys():
-        if actor[-1] == "v":
+        if Actor.A[actor].actor_type == actor_type:
             Move(Actor.A[actor], target, screen, graph = graph, unavailable = unavailable)
 
     return num
+
+################################################################################
+######################### INTERACTIONS #########################################
+################################################################################
+def meetings():
+    pass
 
 ################################################################################
 ###################### RUN #####################################################
 ################################################################################
 
 if __name__ == "__main__":
-    run("cardio_alt.png", s = 7)
+   run("cardio_alt.png", s = 7)

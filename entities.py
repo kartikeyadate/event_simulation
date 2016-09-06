@@ -9,7 +9,6 @@ from colors import *
 ################################################################################
 #######################CLASSES DESCRIBING SPACE: CELL, COLLECTION###############
 ################################################################################
-
 class Cell(object):
     """
     Creates a square cell object of size s pixels at coordinate (x, y)
@@ -200,7 +199,6 @@ class Cell(object):
         x1, y1, z1 = a
         x2, y2, z2 = b
         return math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
-
 
 class Collection(object):
     """
@@ -531,13 +529,14 @@ class Actor(object):
     Definition of the actor.
     """
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), profile = dict()):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), profile = dict(), actor_type = None):
         self.name = name
+        self.actor_type = actor_type
         self.x = x
         self.y = y
         self.color = color
         self.personal_space = set()
-        if zone is not None:
+        if zone is not None and self.x is None and self.y is None:
             self.initialize_in_zone(zone)
         self.zone = zone
         Collection.Z[self.zone].actors.add(self.name)
@@ -547,6 +546,7 @@ class Actor(object):
             Collection.T[self.threshold].actors.add(self.name)
         self.facing = facing
         self.profile = profile
+        self.set_personal_space()
         Actor.A[self.name] = self
         Cell.C[(self.x, self.y)].is_occupied = True
 
@@ -575,7 +575,6 @@ class Actor(object):
                     if c in self.personal_space:
                         self.personal_space.remove(c)
 
-
     def set_personal_space(self):
         """
         Sets the personal space of the actor in current position.
@@ -589,7 +588,7 @@ class Actor(object):
 
     def move(self, c):
         """
-        Moves actor from current position to a new position c
+        Moves actor from current position to a new position c.
         """
         ox, oy = self.x, self.y
         cx, cy = c
@@ -619,6 +618,9 @@ class Actor(object):
                     Collection.T[old_t].actors.remove(self.name)
 
     def kill(self):
+        """
+        Destroy actor object and remove it from Actor.A dictionary.
+        """
         if self.zone is not None:
             if self.name in Collection.Z[self.zone].actors:
                 Collection.Z[self.zone].actors.remove(self.name)
@@ -685,7 +687,6 @@ class Target:
             possible_zones = [i for i in Collection.Z.keys()]
             self.zone = random.choice(possible_zones)
             self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
-
 
 ################################################################################
 ######## CLASSES FOR SEARCH ####################################################
@@ -902,7 +903,6 @@ class Move:
                 return Cell.C[start].zone
             if Cell.C[target].zone is not None:
                 return Cell.C[target].zone
-
 
 class Meet:
     def __init__(self, actors = set(), zones = set(), duration = set(), end_conditions = set()):
