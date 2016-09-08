@@ -69,23 +69,32 @@ class Cell(object):
         if not self.in_zone and not self.in_threshold:
             return "Location: " + '('+str(self.x) + ', ' + str(self.y) + ')'
 
-    def neighbours(self):
+    def neighbours(self, radius = 1):
         """
         Returns a list of cells neighbouring this cell.
-        von Neumann neighbours are considered.
+        Moore neighbours are considered.
         """
         x, y = self.x, self.y
-        results = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
-                   (x + 1, y + 1), (x + 1, y - 1), (x - 1, y + 1), (x - 1, y - 1)]
+        results = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1), (x + 1, y + 1), (x + 1, y - 1), (x - 1, y + 1), (x - 1, y - 1)]
+        if radius == 2:
+            for r in results:
+                a, b = r
+                results += [(a + 1, b), (a - 1, b), (a, b + 1), (a, b - 1), (a + 1, b + 1), (a + 1, b - 1), (a - 1, b + 1), (a - 1, b - 1)]
+            results = list(set(results))
         nbrs = [r for r in results if r in Cell.C.keys()]
         return nbrs
 
-    def orthogonal_neighbours(self):
+    def orthogonal_neighbours(self, radius = 1):
         """
-        Returns a list of cells orthogonal neighbours this cell.
+        Returns a list of cells von Neumann neighbours this cell.
         """
         x, y = self.x, self.y
         results = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+        if radius == 2:
+            for r in results:
+                a, b = r
+                results += [(a + 1, b), (a - 1, b), (a, b + 1), (a, b - 1)]
+            results = list(set(results))
         nbrs = [r for r in results if r in Cell.C.keys()]
         return nbrs
 
@@ -199,6 +208,7 @@ class Cell(object):
         x1, y1, z1 = a
         x2, y2, z2 = b
         return math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
+
 
 class Collection(object):
     """
@@ -556,9 +566,10 @@ class Actor(object):
         """
         options = Collection.Z[z].cells
         ox, oy = self.x, self.y
+        if ox is not None and oy is not None:
+            self.remove_personal_space()
         self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
         self.zone = Cell.C[(self.x, self.y)].zone
-        self.set_personal_space()
         if ox is not None and oy is not None:
             Cell.C[(ox, oy)].is_occupied = False
         Cell.C[(self.x, self.y)].is_occupied = True
@@ -578,7 +589,7 @@ class Actor(object):
     def set_personal_space(self):
         """
         Sets the personal space of the actor in current position.
-        Currently, personal space is the von Neumann neighbourhood of the current position.
+        Currently, personal space is the Moore neighbourhood of the current position.
         """
         for c in Cell.C[(self.x, self.y)].nbrs:
             if not Cell.C[c].is_barrier:
@@ -718,8 +729,8 @@ class PriorityQueue:
 class Search:
     """
     A definition of the A* search algorithm.
-    Based on Amit Patel's implementation at Red Blob Games.
-    http://www-cs-students.stanford.edu/~amitp/gameprog.html
+    Based on Amit Patel's description and implementation.
+    See:W://www-cs-students.stanford.edu/~amitp/gameprog.html
     Is used to conduct the threshold and zone searches in Move.
     start: a tuple (x, y)
     goal: a tuple (x, y)
@@ -905,8 +916,22 @@ class Move:
                 return Cell.C[target].zone
 
 class Meet:
-    def __init__(self, actors = set(), zones = set(), duration = set(), end_conditions = set()):
+    def __init__(self, actors = set(), zones = set(), duration = set(), status = None):
         self.actors = actors
         self.zones = zones
         self.duration = duration
-        self.end_conditions = end_conditions
+        self.status = status
+        self.state = 0
+
+    def update(self):
+        self.state += 1
+        if self.duration > self.state> 0:
+            self.status = "in_progress"
+        if self.state == self.duration:
+            self.status = "completed"
+        if self.state == 0:
+            self.status = "not_initialized"
+
+    def report_status():
+        return self.status
+

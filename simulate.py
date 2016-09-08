@@ -1,6 +1,5 @@
 #!/usr/bin/python3.5 
 #simulate.py This file contains the description of the instance of the simulation.
-#To run the simulation, run ./simulate.py in the unix terminal
 
 import sys, time, math, random, heapq, pygame
 from operator import itemgetter
@@ -14,13 +13,19 @@ def run(img, s = 5):
     FPS = 5
     w, h = Cell.create_space_from_plan(s, img) #Create a dictionary of all cells.
     Collection.generate_zones_and_thresholds()
+    ### Sets of zones by zone type.
+    corridor = {"13", "14", "15", "16", "3", "6", "22", "28", "34", "41", "51", "58", "65", "70", "71", "72", "73", "79", "84", "89", "44", "45", "46", "47"}
+    day_room = {"50", "54", "57", "62", "64", "69"}
+    nurse_station = {"21", "31", "33"}
+    patient_rooms = {"0", "1", "2","4", "7", "18", "23", "30", "35", "43", "52", "59", "66", "74", "80", "85", "90"}
+    #############################################################
     print("Created space consisting of ", len(Cell.C), "cells.")
     screen = pygame.display.set_mode((w, h))  # create screen
     pygame.display.set_caption("IDEALIZED HOSPITAL WARD")
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
-    v_name = make_actors(v_name = 0, n = 20, actor_type = "staff")
-    v_name = make_actors(v_name = v_name, actor_type = "nurses", color = green, locations = ((50, 43, "21"), (55, 43, "21"), (60, 43, "21"), (78, 43, "31"), (83, 43, "31"), (88, 43, "31")))
+    v_name = make_actors(v_name = 0, n = 50, actor_type = "staff")
+    v_name = make_actors(v_name = v_name, actor_type = "nurses", color = green, locations = ((50, 43, "21"), (55, 43, "21"), (60, 43, "21"), (78, 43, "33"), (83, 43, "33"), (88, 43, "33")))
     v_num = int(v_name)
     tf = 0
     g = Collection.TG
@@ -28,18 +33,18 @@ def run(img, s = 5):
         tf += 1
         screen.fill(white) #screen.blit(background,(0,0))
         conduct_searches(screen, actor_type = "staff")
-        v_num = spawn_actors(v_num, tf, g, target, screen, start_in = "65", interval = range(5, 60), unavailable = {"21", "31", "33"}, actor_type = "visitor")
+        v_num = spawn_actors(v_num, tf, g, target, screen, start_in = "70", interval = range(5, 60), unavailable = {"21", "31", "33"}, actor_type = "visitor")
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
         Actor.draw_all_actors(screen, min_size = 5)
-        manage_io_events(screen, highlight = True, report = True)
+        manage_io_events(screen, highlight = True, report = True, possible = corridor)
         pygame.display.update()
         clock.tick(FPS)
 
 ################################################################################
 ################### EVENT FUNCTIONS ############################################
 ################################################################################
-def manage_io_events(screen, highlight = False, report = False):
+def manage_io_events(screen, highlight = False, report = False, possible = None):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
     if report:
         if mpos in Cell.C.keys():
@@ -53,7 +58,7 @@ def manage_io_events(screen, highlight = False, report = False):
             sys.exit
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                reset_actor_positions(actor_type = "staff")
+                reset_actor_positions(actor_type = "staff", possible = possible)
 
 def highlight_zone(screen, mpos):
     for z in Collection.Z:
@@ -109,12 +114,15 @@ def make_actors(v_name = None, n = None, actor_type = None, color = None, locati
             Actor(actor_name, x = x_pos, y = y_pos, zone = z, color = color, actor_type = actor_type)
     return v_name
 
-def reset_actor_positions(actor_type = None):
+def reset_actor_positions(actor_type = None, possible = None):
     """
     Resets the positions of all actors in all available zones.
     An available zone is one which has at least one threshold.
     """
-    available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
+    if possible is None:
+        available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
+    else:
+        available_zones = list(possible)
     for a in Actor.A:
         if actor_type in a:
             new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
