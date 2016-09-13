@@ -539,7 +539,7 @@ class Actor(object):
     Definition of the actor.
     """
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), profile = dict(), actor_type = None):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), unavailable = set(), actor_type = None):
         self.name = name
         self.actor_type = actor_type
         self.x = x
@@ -555,7 +555,7 @@ class Actor(object):
         if self.threshold is not None:
             Collection.T[self.threshold].actors.add(self.name)
         self.facing = facing
-        self.profile = profile
+        self.unavailable = set()
         self.set_personal_space()
         Actor.A[self.name] = self
         Cell.C[(self.x, self.y)].is_occupied = True
@@ -844,9 +844,9 @@ class Move:
     def check_done(self):
         return (self.actor.x, self.actor.y) in Cell.C[(self.target.x, self.target.y)].nbrs
 
-    def go(self):
+    def go(self, ignore = set()):
         if self.actor.zone == self.target.zone:
-            ZS = self.zone_search((self.actor.x, self.actor.y), (self.target.x, self.target.y))
+            ZS = self.zone_search((self.actor.x, self.actor.y), (self.target.x, self.target.y), ignore = ignore)
             if ZS.path is not None and len(ZS.path) > 1:
                 ZS.draw_route(self.screen, color = red)
                 self.actor.move(ZS.path[1])
@@ -856,17 +856,23 @@ class Move:
             S = self.threshold_search()
             if S.path is not None:
                 S.draw_route(self.screen, color = verylightgrey)
-                ZS = self.zone_search(S.path[0], S.path[1])
+                ZS = self.zone_search(S.path[0], S.path[1], ignore = ignore)
+                if ZS.path is None:
+                    ignore.add(S.path[1])
+                    options = [i for i in Cell.C[S.path[1]].nbrs if Cell.C[i].in_threshold]
+                    if len(options) > 0:
+                        ZS = self.zone_search(S.path[0], options[0], ignore = ignore)
+
                 if ZS.path is not None:
                     ZS.draw_route(self.screen, color = red)
                     self.actor.move(ZS.path[1])
                     ZS.path.pop(0)
 
-    def threshold_search(self):
+
+    def threshold_search(self, ignore = set()):
         A = self.actor.x, self.actor.y
         B = self.target.x, self.target.y
 
-        ignore = set()
         #Avoid stepping into other actors' personal space.
         for actor in Actor.A.keys():
             if actor != self.actor.name and actor != self.target.name:
@@ -877,6 +883,8 @@ class Move:
                     intersect = Actor.A[actor].personal_space.intersection(Collection.Z[z].threshold_cells)
                     if len(intersect) > 0:
                         ignore = ignore.union(intersect)
+
+
         #Avoid using zones which are unavailable.
         for u in self.unavailable:
             for c in Collection.Z[u].threshold_cells:
@@ -889,11 +897,10 @@ class Move:
 
         return Search(A, B, graph = self.graph, ignore = ignore)
 
-    def zone_search(self, a, b):
+    def zone_search(self, a, b, ignore = set()):
         zone = self.get_zone(a, b)
         if zone is None:
             print("Valid zone was not returned!")
-        ignore = set()
         for actor in Collection.Z[zone].actors:
             if actor != self.actor.name and actor!= self.target.name:
                 ignore = ignore.union(Actor.A[actor].personal_space)
