@@ -1,18 +1,21 @@
 #!/usr/bin/python3.5 
 #simulate.py This file contains the description of the instance of the simulation.
 
-import sys, time, math, random, heapq, pygame
-from operator import itemgetter
-from collections import defaultdict
+import sys
+import math
+import random
+import pygame
 from colors import *
 from entities import *
 
-def run(img, s = 5):
+def run(img, s=5):
     pygame.init()
     clock = pygame.time.Clock()
-    FPS = 10
-    w, h = Cell.create_space_from_plan(s, img) #Create a dictionary of all cells.
-    Collection.generate_zones_and_thresholds() #Generate zones and thresholds.
+    frame = 10
+
+    #Setup space
+    w, h = Cell.create_space_from_plan(s, img)
+    Collection.generate_zones_and_thresholds()
 
     ### Sets of zones by zone type.
     all_zones = set(Collection.Z.keys())
@@ -27,25 +30,31 @@ def run(img, s = 5):
     #############################################################
     #############################################################
     print("Created space consisting of ", len(Cell.C), "cells.")
+
     screen = pygame.display.set_mode((w, h))  # create screen
     pygame.display.set_caption("IDEALIZED HOSPITAL WARD")
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
-    v = make_actors(v_name = 0, n = 80, actor_type = "staff", unavailable = None)
+    v = 0
     v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None, locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
+    v = make_actors(v_name = v, n = 20, actor_type = "BLUE", color = blue, unavailable = offices|patient_rooms|medicine_room|nurse_station)
+    v = make_actors(v_name = v, n = 20, actor_type = "RED", color = red, unavailable = offices|patient_rooms|medicine_room|nurse_station)
+    setup_friends()
     tf = 0
     g = Collection.TG
     while True:
         tf += 1
         screen.fill(white) #screen.blit(background,(0,0))
-        conduct_searches(screen, actor_type = "staff")
         v = spawn_actors(v, tf, g, target, screen, start_in = "70", interval = range(5, 60), unavailable = offices|nurse_station|medicine_room, actor_type = "visitor")
+        conduct_searches(screen)
+        Unplanned.check_all()
+        Unplanned.update_all()
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
         Actor.draw_all_actors(screen, min_size = 5)
-        manage_io_events(screen, highlight = True, report = True, possible = corridor)
+        manage_io_events(screen, highlight = True, report = False, possible = corridor)
         pygame.display.update()
-        clock.tick(FPS)
+        clock.tick(frame)
 
 ################################################################################
 ################### EVENT FUNCTIONS ############################################
@@ -65,7 +74,8 @@ def manage_io_events(screen, highlight = False, report = False, possible = None)
             sys.exit
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                reset_actor_positions(actor_type = "staff", possible = possible)
+                reset_actor_positions(actor_type = "BLUE", possible = possible)
+                reset_actor_positions(actor_type = "RED", possible = possible)
 
 def highlight_zone(screen, mpos):
     for z in Collection.Z:
@@ -91,12 +101,12 @@ def conduct_searches(screen, actor_type = None):
     """
     Conducts n/2 searches among the population of n actors.
     """
-    a = [i for i in Actor.A.keys() if actor_type in i and int(i.split("_")[0]) % 2 != 0]
-    t = [i for i in Actor.A.keys() if actor_type in i and int(i.split("_")[0]) % 2 == 0]
+    a = [i for i in Actor.A.keys() if Actor.A[i].actor_type == "BLUE"]
+    t = [i for i in Actor.A.keys() if Actor.A[i].actor_type == "RED"]
     s = min(len(a), len(t))
     tg = Collection.TG
     for i in range(s):
-        Move(Actor.A[str(a[i])], Actor.A[str(t[i])], screen, graph = tg)
+       Move(Actor.A[str(a[i])], Actor.A[str(t[i])], screen, graph = tg)
 
 ################################################################################
 ################### ACTOR FUNCTIONS ############################################
@@ -114,6 +124,7 @@ def reset_actor_positions(actor_type = None, possible = None):
         if actor_type in a:
             new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
             Actor.A[a].move(new_pos)
+    Unplanned.Completed = set()
 
 def make_actors(v_name = None, n = None, actor_type = None, color = None, unavailable = set(), locations = None):
     """
@@ -122,8 +133,9 @@ def make_actors(v_name = None, n = None, actor_type = None, color = None, unavai
     if v_name is None:
         v_name = 0
     if n is not None and locations is None:
+        max_act = v_name + n
         available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
-        while v_name < n:
+        while v_name < max_act:
             v_name += 1
             actor_name = str(v_name) + "_" + actor_type
             Actor(actor_name, zone = random.choice(available_zones), color = color, unavailable = unavailable, actor_type = actor_type)
@@ -168,6 +180,16 @@ def spawn_actors(name, tf, graph, target, screen, start_in = None, interval = ra
             Move(Actor.A[actor], target, screen, graph = graph, unavailable = unavailable)
 
     return str(num)
+
+def setup_friends():
+    a = {i for i in Actor.A.keys() if Actor.A[i].actor_type == "BLUE"}
+    for act in a:
+        Actor.A[act].friends = a.difference({act})
+
+    a = {i for i in Actor.A.keys() if Actor.A[i].actor_type == "RED"}
+    for act in a:
+        Actor.A[act].friends = a.difference({act})
+
 
 ################################################################################
 ######################### INTERACTIONS #########################################

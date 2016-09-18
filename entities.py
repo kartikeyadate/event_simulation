@@ -1,4 +1,4 @@
-#!/usr/bin/python3.5 
+#j/usr/bin/python3.5 
 #entities.py This file contains class definitions for the Cell, Collection, Actor, Target, Move, Meet and Search 
 import sys, time, math, random, heapq, pygame, copy, itertools
 from PIL import Image
@@ -539,9 +539,12 @@ class Actor(object):
     Definition of the actor.
     """
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), unavailable = set(), actor_type = None):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), unavailable = set(), actor_type = None, sociability = random.random(), friends = set()):
         self.name = name
         self.actor_type = actor_type
+        self.friends = friends
+        self.sociability = sociability
+        self.in_meeting = False
         self.x = x
         self.y = y
         self.color = color
@@ -597,9 +600,17 @@ class Actor(object):
                     Cell.C[c].is_personal = True
                     self.personal_space.add(c)
 
+    def add_friends(self, friends):
+        if type(friends) == set:
+            for f in friends:
+                print(f)
+                self.friends.add(f)
+        if type(friends) == str:
+            self.friends.add(friends)
+
     def move(self, c):
         """
-        Moves actor from current position to a new position c.
+        Movess actor from current position to a new position c.
         """
         ox, oy = self.x, self.y
         cx, cy = c
@@ -653,8 +664,14 @@ class Actor(object):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
         radius = max(min_size, int(Cell.size/2))
         pygame.draw.circle(screen, self.color, center, radius)
+
+        if self.in_meeting:
+            color = gold
+        else:
+            color = tomato
+
         for c in self.personal_space:
-            Cell.C[c].draw(screen, drawing_type = "graph", color = tomato)
+            Cell.C[c].draw(screen, drawing_type = "graph", color = color)
 
     @staticmethod
     def draw_all_actors(screen, min_size = 4):
@@ -832,7 +849,7 @@ class Search:
 ###################################### EVENT CLASSES #################################################
 
 class Move:
-    def __init__(self, actor, target, screen, graph = dict(), unavailable = set()):
+    def __init__(self, actor, target, screen, graph=dict(), unavailable=set()):
         self.actor = actor
         self.target = target
         self.screen = screen
@@ -844,32 +861,32 @@ class Move:
     def check_done(self):
         return (self.actor.x, self.actor.y) in Cell.C[(self.target.x, self.target.y)].nbrs
 
-    def go(self, ignore = set()):
-        if self.actor.zone == self.target.zone:
-            ZS = self.zone_search((self.actor.x, self.actor.y), (self.target.x, self.target.y), ignore = ignore)
-            if ZS.path is not None and len(ZS.path) > 1:
-                ZS.draw_route(self.screen, color = red)
-                self.actor.move(ZS.path[1])
-                ZS.path.pop(0)
-
-        elif self.actor.zone != self.target.zone:
-            S = self.threshold_search()
-            if S.path is not None:
-                S.draw_route(self.screen, color = verylightgrey)
-                ZS = self.zone_search(S.path[0], S.path[1], ignore = ignore)
-                if ZS.path is None:
-                    ignore.add(S.path[1])
-                    options = [i for i in Cell.C[S.path[1]].nbrs if Cell.C[i].in_threshold]
-                    if len(options) > 0:
-                        ZS = self.zone_search(S.path[0], options[0], ignore = ignore)
-
-                if ZS.path is not None:
-                    ZS.draw_route(self.screen, color = red)
+    def go(self, ignore=set()):
+        if not self.actor.in_meeting:
+            if self.actor.zone == self.target.zone:
+                ZS = self.zone_search((self.actor.x, self.actor.y), (self.target.x, self.target.y), ignore=ignore)
+                if ZS.path is not None and len(ZS.path) > 1:
+                    ZS.draw_route(self.screen, color=red)
                     self.actor.move(ZS.path[1])
                     ZS.path.pop(0)
 
+            elif self.actor.zone != self.target.zone:
+                S = self.threshold_search()
+                if S.path is not None:
+                    S.draw_route(self.screen, color=verylightgrey)
+                    ZS = self.zone_search(S.path[0], S.path[1], ignore=ignore)
+                    if ZS.path is None:
+                        ignore.add(S.path[1])
+                        options = [i for i in Cell.C[S.path[1]].nbrs if Cell.C[i].in_threshold]
+                        if len(options) > 0:
+                            ZS = self.zone_search(S.path[0], options[0], ignore=ignore)
 
-    def threshold_search(self, ignore = set()):
+                    if ZS.path is not None:
+                        ZS.draw_route(self.screen, color=red)
+                        self.actor.move(ZS.path[1])
+                        ZS.path.pop(0)
+
+    def threshold_search(self, ignore=set()):
         A = self.actor.x, self.actor.y
         B = self.target.x, self.target.y
 
@@ -895,17 +912,17 @@ class Move:
         if B not in self.graph:
             self.graph[B] = [i for i in Collection.Z[Cell.C[B].zone].threshold_cells]
 
-        return Search(A, B, graph = self.graph, ignore = ignore)
+        return Search(A, B, graph=self.graph, ignore=ignore)
 
-    def zone_search(self, a, b, ignore = set()):
+    def zone_search(self, a, b, ignore=set()):
         zone = self.get_zone(a, b)
         if zone is None:
             print("Valid zone was not returned!")
         for actor in Collection.Z[zone].actors:
-            if actor != self.actor.name and actor!= self.target.name:
+            if actor != self.actor.name and actor != self.target.name:
                 ignore = ignore.union(Actor.A[actor].personal_space)
 
-        return Search(a, b, graph = Collection.Z[zone].graph, ignore = ignore)
+        return Search(a, b, graph=Collection.Z[zone].graph, ignore=ignore)
 
     def get_zone(self, start, target):
         if not Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
@@ -922,23 +939,84 @@ class Move:
             if Cell.C[target].zone is not None:
                 return Cell.C[target].zone
 
-class Meet:
-    def __init__(self, actors = set(), zones = set(), duration = set(), status = None):
+class Unplanned:
+    """
+    Checks all the actors for all possible meetings between 2 actors.
+    The conditions required to satisfy a meeting are:
+    1. both actors in question should not be in a meeting.
+    2. the actors' personal space should overlap.
+    """
+    M = dict()
+    Completed = set()
+    def __init__(self, ID, actors=set(), duration=25, status="not_initialized"):
+        """
+        Initialize a meeting object
+        """
+        self.ID = ID
         self.actors = actors
-        self.zones = zones
         self.duration = duration
         self.status = status
         self.state = 0
+        Unplanned.M[self.ID] = self
 
-    def update(self):
-        self.state += 1
-        if self.duration > self.state> 0:
+    def update(self, step = 1):
+        """
+        Update the status of a meeting.
+        The status is an integer.
+        If the status is equal to the assigned duration,
+        the status of the meeting is changed to 'completed'.
+        If status is greater than zero and less and duration,
+        the status of the meeting is 'in_progress'.
+        """
+        self.state += step
+        if self.state < self.duration:
             self.status = "in_progress"
-        if self.state == self.duration:
+        elif self.state >= self.duration:
             self.status = "completed"
-        if self.state == 0:
+        else:
             self.status = "not_initialized"
 
-    def report_status():
+    def report_status(self):
+        """ Report current status of the meeting."""
         return self.status
+
+    @staticmethod
+    def check_all():
+        """
+        Check the status of all meetings in the meeting dictionary.
+        """
+        for a in Actor.A:
+            if not Actor.A[a].in_meeting:
+                for b in Actor.A[a].friends:
+                    if not Actor.A[b].in_meeting:
+                        if not Actor.A[a].personal_space.isdisjoint(Actor.A[b].personal_space):
+                            m = "_".join(sorted([a,b]))
+                            if m not in Unplanned.Completed:
+                                if 0.5*(Actor.A[a].sociability + Actor.A[b].sociability) > 0.5:
+                                    meet = Unplanned(m, actors = {a, b}, duration = random.choice(list(range(5, 50))), status = "not_initialized")
+                                    Unplanned.M[meet.ID] = meet
+                                    Actor.A[a].in_meeting = True
+                                    Actor.A[b].in_meeting = True
+
+
+    @staticmethod
+    def update_all():
+        """
+        Updates the status of all events stored in the Unplanned.M dictionary.
+        If an event is complete, it is destroyed. The status of Actors in the meeting
+        is set to False.
+        """
+        remove = set()
+        if len(Unplanned.M) > 0:
+            for m in Unplanned.M.keys():
+                if Unplanned.M[m].status == "completed":
+                    Unplanned.Completed.add(m)
+                    for a in Unplanned.M[m].actors:
+                        Actor.A[a].in_meeting = False
+                    remove.add(m)
+                else:
+                    Unplanned.M[m].update()
+        for r in remove:
+            del Unplanned.M[r]
+
 
