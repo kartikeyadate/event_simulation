@@ -19,7 +19,7 @@ def check_orthogonal_cells(start, x, y, screen, color):
             cy += dy
             if 0 < cx < x and 0 < cy < y:
                 draw(cx, cy, s, screen, color)
-        cx, cy = start            
+        cx, cy = start 
         
 def check_diagonal_cells(start, x, y, screen, color):
     directions = (1, 1), (-1, 1), (-1, -1), (1, -1)

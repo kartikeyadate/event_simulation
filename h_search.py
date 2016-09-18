@@ -16,7 +16,7 @@ def run_events():
 def run():
     pygame.init()
 #    w, h, s = 1200, 800, 8
-    w, h, s = 800, 600, 5
+    w, h, s = 1520, 640, 8
     clock = pygame.time.Clock()  # create a clock object
     FPS = 5  # set frame rate in frames per second.
 #    s = 5
@@ -32,7 +32,7 @@ def run():
     for zone in infested_zones:
         make_roaches(2, 3, 20, tomato, z = zone)
         make_roaches(2, 5, -40, lightgrey, z = zone)
-    create_actors(50, poison_threshold)
+    create_actors(150, poison_threshold)
     make_roaches(40, 3, 25, tomato)  # 1 DataMap
     make_roaches(25, 5, -50, lightgrey)  # 3 DataMap
     move_actors(infested_zones)
