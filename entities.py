@@ -539,7 +539,7 @@ class Actor(object):
     Definition of the actor.
     """
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), unavailable = set(), actor_type = None, sociability = random.random(), friends = set()):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), unavailable = set(), actor_type = None, sociability = random.choice([0.5, 0.6,0.7,0.8,0.9,1.0]), friends = set()):
         self.name = name
         self.actor_type = actor_type
         self.friends = friends
@@ -992,7 +992,7 @@ class Unplanned:
                         if not Actor.A[a].personal_space.isdisjoint(Actor.A[b].personal_space):
                             m = "_".join(sorted([a,b]))
                             if m not in Unplanned.Completed:
-                                if 0.5*(Actor.A[a].sociability + Actor.A[b].sociability) > 0.5:
+                                if 0.5*(Actor.A[a].sociability + Actor.A[b].sociability) > 0.3:
                                     meet = Unplanned(m, actors = {a, b}, duration = random.choice(list(range(5, 50))), status = "not_initialized")
                                     Unplanned.M[meet.ID] = meet
                                     Actor.A[a].in_meeting = True
@@ -1018,5 +1018,11 @@ class Unplanned:
                     Unplanned.M[m].update()
         for r in remove:
             del Unplanned.M[r]
+
+class Room:
+    def __init__(self, zones = set()):
+        self.__zones = zones
+
+
 
 

@@ -36,23 +36,27 @@ def run(img, s=5):
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
     v = 0
-    v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None, locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
-    v = make_actors(v_name = v, n = 20, actor_type = "BLUE", color = blue, unavailable = offices|patient_rooms|medicine_room|nurse_station)
-    v = make_actors(v_name = v, n = 20, actor_type = "RED", color = red, unavailable = offices|patient_rooms|medicine_room|nurse_station)
+    v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None,\
+                    locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
+    v = make_actors(v_name = v, n = 20, actor_type = "BLUE", color = steelblue,\
+                    unavailable = offices|patient_rooms|medicine_room|nurse_station)
+    v = make_actors(v_name = v, n = 20, actor_type = "RED", color = tomato,\
+                    unavailable = offices|patient_rooms|medicine_room|nurse_station)
     setup_friends()
     tf = 0
     g = Collection.TG
     while True:
         tf += 1
         screen.fill(white) #screen.blit(background,(0,0))
-        v = spawn_actors(v, tf, g, target, screen, start_in = "70", interval = range(5, 60), unavailable = offices|nurse_station|medicine_room, actor_type = "visitor")
+        v = spawn_actors(v, tf, g, target, screen, start_in = "70", interval = range(5, 60),\
+                         unavailable = offices|nurse_station|medicine_room, actor_type = "visitor")
         conduct_searches(screen)
         Unplanned.check_all()
         Unplanned.update_all()
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
-        Actor.draw_all_actors(screen, min_size = 5)
-        manage_io_events(screen, highlight = True, report = False, possible = corridor)
+        Actor.draw_all_actors(screen, min_size = 6)
+        manage_io_events(screen, highlight = True, report = True, possible = corridor)
         pygame.display.update()
         clock.tick(frame)
 
@@ -80,7 +84,7 @@ def manage_io_events(screen, highlight = False, report = False, possible = None)
 def highlight_zone(screen, mpos):
     for z in Collection.Z:
         if mpos in Collection.Z[z].cells:
-            #Collection.Z[z].draw(screen, color = powderblue)
+            Collection.Z[z].draw(screen, color = coral)
             label(screen, z)
 
 def highlight_threshold(screen, mpos):
@@ -159,7 +163,7 @@ def spawn_actors(name, tf, graph, target, screen, start_in = None, interval = ra
     inter = random.choice(interval)
     if tf % inter == 0:
         v_name = str(num) + "_" + actor_type
-        Actor(v_name, zone = start_in, color = teal, actor_type = actor_type)
+        Actor(v_name, zone = start_in, color = darkkhaki, actor_type = actor_type)
         num += 1
 
     # identify actors who have reached their target.
@@ -189,7 +193,6 @@ def setup_friends():
     a = {i for i in Actor.A.keys() if Actor.A[i].actor_type == "RED"}
     for act in a:
         Actor.A[act].friends = a.difference({act})
-
 
 ################################################################################
 ######################### INTERACTIONS #########################################
