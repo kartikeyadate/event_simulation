@@ -847,6 +847,43 @@ class Search:
 
 ######################################################################################################
 ###################################### EVENT CLASSES #################################################
+class Spawn:
+    def __init__(self, name=None, color=khaki, tf=None, start_in=None, target=None, screen=None, interval=range(5, 60), unavailable=None, actor_type=None, graph=None):
+        self.name = name
+        self.color = color
+        self.tf = tf
+        self.start_in = start_in
+        self.target = target
+        self.screen = screen
+        self.interval = interval
+        self.unavailable = unavailable
+        self.actor_type = actor_type
+        self.graph = graph
+        self.go()
+
+    def go(self):
+        num = int(self.name)
+        inter = random.choice(self.interval)
+        if self.tf % inter == 0:
+            v_name = str(num) + "_" + self.actor_type
+            Actor(v_name, zone = self.start_in, color = self.color, actor_type = self.actor_type)
+            num += 1
+
+        done = set()
+        for actor in Actor.A.keys():
+            if Actor.A[actor].actor_type == self.actor_type:
+                if(Actor.A[actor].x, Actor.A[actor].y) in Cell.C[(self.target.x, self.target.y)].nbrs:
+                    done.add(actor)
+
+        for d in done:
+            Actor.A[d].kill()
+            print("Killed", d)
+
+        for actor in Actor.A.keys():
+            if Actor.A[actor].actor_type == self.actor_type:
+                Move(Actor.A[actor], self.target, self.screen, self.graph, self.unavailable)
+
+        self.name = str(num)
 
 class Move:
     def __init__(self, actor, target, screen, graph=dict(), unavailable=set()):

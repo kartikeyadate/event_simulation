@@ -45,11 +45,12 @@ def run(img, s=5):
     setup_friends()
     tf = 0
     g = Collection.TG
+
     while True:
         tf += 1
-        screen.fill(white) #screen.blit(background,(0,0))
-        v = spawn_actors(v, tf, g, target, screen, start_in = "70", interval = range(5, 60),\
-                         unavailable = offices|nurse_station|medicine_room, actor_type = "visitor")
+        screen.fill(white)
+        spawn = Spawn(name=v, color=khaki, tf=tf, start_in="70", target=target, screen=screen, interval=range(5,60), unavailable=offices|nurse_station|medicine_room, actor_type="visitor", graph=g)
+        v = spawn.name
         conduct_searches(screen)
         Unplanned.check_all()
         Unplanned.update_all()
