@@ -8,7 +8,7 @@ import pygame
 from colors import *
 from entities import *
 
-def run(img, s=8):
+def run(img, s=5):
     pygame.init()
     clock = pygame.time.Clock()
     frame = 10
@@ -36,28 +36,26 @@ def run(img, s=8):
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
     v = 0
-    #v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None,\
-                    #locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
-    v = make_actors(v_name = v, n = 10, actor_type = "BLUE", color = steelblue,\
-                    unavailable = set())
-    v = make_actors(v_name = v, n = 10, actor_type = "RED", color = gold,\
-                    unavailable = set())
+    v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None,\
+                    locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
+    v = make_actors(v_name = v, n = 20, actor_type = "BLUE", color = steelblue,\
+                    unavailable = offices|patient_rooms|medicine_room|nurse_station)
+    v = make_actors(v_name = v, n = 20, actor_type = "RED", color = gold,\
+                    unavailable = offices|patient_rooms|medicine_room|nurse_station)
     setup_friends()
     tf = 0
     g = Collection.TG
+    Collection.check_diagonal_thresholds()
     #infest(n=100, zones = corridor, p = 10)
     #infest(n = 50, zones = day_room, p = 20)
     #infest(n = 70, zones = corridor|day_room, p = -25)
-    Collection.test_assignments()
-
-
     while True:
         tf += 1
         screen.fill(white)
-        #spawn = Spawn(name=v, color=tomato, tf=tf, start_in="70", target=target, screen=screen, interval=range(5,60), unavailable=offices|nurse_station|medicine_room|day_room, actor_type="visitor", graph=g)
-        #v = spawn.name
+        spawn = Spawn(name=v, color=tomato, tf=tf, start_in="70", target=target, screen=screen, interval=range(5,60), unavailable=offices|nurse_station|medicine_room, actor_type="visitor", graph=g)
+        v = spawn.name
         #update_infestation()
-        #conduct_searches(screen)
+        conduct_searches(screen)
         #Unplanned.check_all()
         #Unplanned.update_all()
         Cell.draw_barriers(screen)
@@ -70,6 +68,7 @@ def run(img, s=8):
 ################################################################################
 ################### EVENT FUNCTIONS ############################################
 ################################################################################
+
 def manage_io_events(screen, highlight = False, report = False, possible = None):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
     if report:
@@ -149,6 +148,7 @@ def reset_actor_positions(actor_type = None, possible = None):
         if actor_type in a:
             new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
             Actor.A[a].move(new_pos)
+    Unplanned.Completed = set()
 
 def make_actors(v_name = None, n = None, actor_type = None, color = None, threshold = None, unavailable = set(), locations = None):
     """
@@ -158,7 +158,7 @@ def make_actors(v_name = None, n = None, actor_type = None, color = None, thresh
         v_name = 0
     if n is not None and locations is None:
         max_act = v_name + n
-        available_zones = [i for i in Collection.Z.keys() if i not in unavailable]
+        available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
         while v_name < max_act:
             v_name += 1
             actor_name = str(v_name) + "_" + actor_type

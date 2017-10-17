@@ -1,5 +1,5 @@
-#j/usr/bin/python3.5 
-#entities.py This file contains class definitions for the Cell, Collection, Actor, Target, Move, Meet and Search 
+#!/usr/bin/python3.6
+#entities.py This file contains class definitions for the Cell, Collection, Actor, Target, Move, Meet and Search
 import sys, time, math, random, heapq, pygame, copy, itertools
 from PIL import Image
 from operator import itemgetter
@@ -31,10 +31,9 @@ class Cell(object):
         self.is_personal =False
         self.in_zone = False
         self.in_threshold = False
-        self.zone = None
         self.threshold = None
-        self.nbrs = list()
         self.zones = set()
+        self.nbrs = list()
         self.poison = 0
 
         Cell.C[(self.x, self.y)] = self
@@ -55,19 +54,7 @@ class Cell(object):
             pygame.draw.rect(screen, color, self.rect, 1)
 
     def __repr__(self):
-        if self.in_threshold:
-            return "Location: " + '('+str(self.x)\
-            + ', ' + str(self.y) + '); In threshold '\
-            + str(self.threshold) + "; Adjacent Zones : "\
-            + ', '.join([str(i) for i in self.zones])
-        if self.in_zone:
-            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + '); In zone '\
-            + str(self.zone) + "; Adjacent thresholds: "\
-            + ', '.join([str(i) for i in Collection.Z[self.zone].thresholds])\
-            + "; Actors: "\
-            + ', '.join([str(i) for i in Collection.Z[self.zone].actors])
-        if not self.in_zone and not self.in_threshold:
-            return "Location: " + '('+str(self.x) + ', ' + str(self.y) + ')'
+        return "Location: " + ','.join((str(self.x),str(self.y))) + "; Zones: " + ",".join(list(self.zones)) + "; Threshold: " + str(self.threshold)
 
     def neighbours(self, radius = 1):
         """
@@ -81,7 +68,7 @@ class Cell(object):
                 a, b = r
                 results += [(a + 1, b), (a - 1, b), (a, b + 1), (a, b - 1), (a + 1, b + 1), (a + 1, b - 1), (a - 1, b + 1), (a - 1, b - 1)]
             results = list(set(results))
-        nbrs = [r for r in results if r in Cell.C.keys()]
+        nbrs = [r for r in results if r in Cell.C.keys() and not Cell.C[r].is_barrier]
         return nbrs
 
     def orthogonal_neighbours(self, radius = 1):
@@ -95,7 +82,7 @@ class Cell(object):
                 a, b = r
                 results += [(a + 1, b), (a - 1, b), (a, b + 1), (a, b - 1)]
             results = list(set(results))
-        nbrs = [r for r in results if r in Cell.C.keys()]
+        nbrs = [r for r in results if r in Cell.C.keys() and not Cell.C[r].is_barrier]
         return nbrs
 
     @staticmethod
@@ -219,14 +206,15 @@ class Collection(object):
     Z = dict()
     T = dict()
     TG = dict()
-    def __init__(self, ID, TYPE):
+    def __init__(self, ID, TYPE, cells = set(), thresholds = set(), threshold_cells = set()):
         self.ID = ID
         self.TYPE = TYPE
-        self.cells = set() #keys (x,y) of cells in collection
+        self.cells = cells #keys (x,y) of cells in collection
         self.center = None
+        self.center_cell = None
         self.graph = dict() #search graph for a zone.
-        self.thresholds = set() #thresholds attached to current zone.
-        self.threshold_cells = set() #keys (x,y) of cells contained in thresholds attached to current zone.
+        self.thresholds = thresholds #thresholds attached to current zone.
+        self.threshold_cells = threshold_cells #keys (x,y) of cells contained in thresholds attached to current zone.
         self.zones = set() #zones connected by current threshold (if collection is a threshold)
         self.tnbrs = set() #neighbouring thresholds for current threshold (if collection is threshold)
         self.available = True #whether of not the current threshold is available to the search.
@@ -254,6 +242,7 @@ class Collection(object):
         xmid = int(0.5*(max(xs) + min(xs)))
         ymid = int(0.5*(max(ys) + min(ys)))
         self.center = (xmid*Cell.size, ymid*Cell.size)
+        self.center_cell = (xmid,ymid)
 
     def draw(self, screen, color = None):
         """Draw this collection"""
@@ -289,6 +278,107 @@ class Collection(object):
                     Cell.C[c].draw(screen, drawing_type = "graph", color = color)
 
     @staticmethod
+    def mzt(x,y,tl=(1,1)):
+        """
+        Generates a two dimensional array of zones in the given cell space. Each zone has x * y cells.
+        """
+        xmax = max([i[0] for i in Cell.C.keys()]) #max x value for cells.
+        ymax = max([i[1] for i in Cell.C.keys()]) #max y value for cells.
+        sx, sy = tl
+        xc = (xmax-sx)//x
+        yc = (ymax-sy)//y
+        name = 0
+        for i in range(sx, xmax-x, x+1):
+            for j in range(sy, ymax-y, y+1):
+                zone = Collection(str(name), "z")
+                zone_cells = set()
+                for p in range(i+1,i+x+1):
+                    for q in range(j+1,j+y+1):
+                        zone_cells.add((p,q))
+                zone.cells = zone_cells
+                for c in zone_cells:
+                    Cell.C[c].zones.add(str(name))
+                    Cell.C[c].in_zone = True
+                name += 1
+
+        thresholds = set()
+        for z in Collection.Z.keys():
+            cells = list(Collection.Z[z].cells)
+            xs = [i[0] for i in cells]
+            ys = [i[1] for i in cells]
+            xmi,ymi = min(xs), min(ys)
+            xma,yma = max(xs), max(ys)
+            length = len(range(xmi-1,xma+2))
+            med = xmi-1 + length//2
+            if length % 2 == 0:
+                ignore = med-2,med-1,med,med+1
+            if length % 2 != 0:
+                ignore = med-2,med-1,med,med+1,med+2
+            tcellsupper = set()
+            tcellslower = set()
+            for i in range(xmi-1,xma+2):
+                if i not in ignore:
+                    Cell.C[(i,ymi-1)].is_barrier = True
+                    Cell.C[(i,yma+1)].is_barrier = True
+                if i in ignore:
+                    tcellsupper.add((i,ymi-1))
+                    tcellslower.add((i,yma+1))
+            thresholds.add(tuple(tcellsupper))
+            thresholds.add(tuple(tcellslower))
+
+            length = len(range(ymi-1,yma+2))
+            med = ymi-1 + length//2
+            tcellsupper = set()
+            tcellslower = set()
+
+            if length % 2 == 0:
+                ignore = med-2,med-1,med,med+1
+            if length % 2 != 0:
+                ignore = med-2,med-1,med,med+1,med+2
+            for i in range(ymi-1,yma+2):
+                if i not in ignore:
+                    Cell.C[(xmi-1,i)].is_barrier = True
+                    Cell.C[(xma+1,i)].is_barrier = True
+                if i in ignore:
+                    tcellsupper.add((xmi-1,i))
+                    tcellslower.add((xma+1,i))
+            thresholds.add(tuple(tcellsupper))
+            thresholds.add(tuple(tcellslower))
+
+        Cell.assign_neighbours()
+        tn = 0
+        for threshold in thresholds:
+            thres = Collection(str(tn), "t", cells = threshold)
+            tb = set()
+            for c in threshold:
+                Cell.C[c].threshold = str(tn)
+                nbrs = Cell.C[c].nbrs
+                tb = tb.union(nbrs)
+            zs = set()
+            for c in tb:
+                zones = Cell.C[c].zones
+                zs = zs.union(zones)
+            thres.zones = zs
+            for c in threshold:
+                Cell.C[c].zones = zs
+                Cell.C[c].in_threshold = True
+            tn += 1
+
+        tzmap = defaultdict(list)
+        for t in Collection.T.keys():
+            for z in Collection.T[t].zones:
+                tzmap[z].append(t)
+
+        for k, v in tzmap.items():
+            Collection.Z[k].thresholds = v
+            tcs = set()
+            for t in v:
+                cells = set(Collection.T[t].cells)
+                tcs = tcs.union(cells)
+            Collection.Z[k].threshold_cells = tcs
+        Collection.generate_graphs()
+
+    @staticmethod
     def generate_zones_and_thresholds():
         zone_cells = set()
         threshold_cells = set()
@@ -305,7 +395,7 @@ class Collection(object):
             zone.cells = cells
             for cell in zone.cells:
                 Cell.C[cell].in_zone = True
-                Cell.C[cell].zone = str(num)
+                Cell.C[cell].zones.add(str(num))
             zone_cells = zone_cells.difference(cells)
             num += 1
 
@@ -465,7 +555,7 @@ class Collection(object):
         for z in Collection.Z.keys():
             for c in Collection.Z[z].cells:
                 Cell.C[c].in_zone = True
-                Cell.C[c].zone = z
+                Cell.C[c].zones.add(z)
                 Cell.C[c].in_threshold = False
                 Cell.C[c].threshold = None
 
@@ -484,14 +574,19 @@ class Collection(object):
         #The use threshold.cells to find all threshold cells.
 
         for z in Collection.Z.keys():
+            thresholds = set()
+            threshold_cells = set()
             for c in Collection.Z[z].cells:
                 for n in Cell.C[c].nbrs:
                     if Cell.C[n].in_threshold:
                         t = Cell.C[n].threshold
                         if t in Collection.T.keys():
                             th_cells = Collection.T[t].cells
-                            Collection.Z[z].thresholds.add(t)
-                            Collection.Z[z].threshold_cells = Collection.Z[z].threshold_cells.union(th_cells)
+                            thresholds.add(t)
+                            threshold_cells = threshold_cells.union(th_cells)
+            Collection.Z[z].thresholds = thresholds
+            Collection.Z[z].threshold_cells = threshold_cells
+
 
         #For every zone, the thresholds connected to it and the threshold cells attached to it are now stored.
 
@@ -499,7 +594,9 @@ class Collection(object):
             for c in Collection.T[t].cells:
                 for n in Cell.C[c].nbrs:
                     if Cell.C[n].in_zone:
-                        Collection.T[t].zones.add(Cell.C[n].zone)
+                        zones = Cell.C[n].zones
+                        for z in zones:
+                            Collection.T[t].zones.add(z)
 
             for c in Collection.T[t].cells:
                 Cell.C[c].zones = Collection.T[t].zones
@@ -512,6 +609,12 @@ class Collection(object):
                         if threshold != t and threshold in Collection.T.keys():
                             tnbrs.add(threshold)
             Collection.T[t].tnbrs = tnbrs
+
+    @staticmethod
+    def check_diagonal_thresholds():
+        for t in Collection.T.keys():
+            xs = [i[0] for i in Collection.T[t].cells]
+            ys = [i[1] for i in Collection.T[t].cells]
 
     @staticmethod
     def create_threshold_graph():
@@ -529,39 +632,67 @@ class Collection(object):
         for z in Collection.Z.keys():
             Collection.Z[z].create_zone_graph()
 
+    @staticmethod
+    def generate_graphs():
+        Collection.create_zone_graphs()
+        Collection.create_threshold_graph()
+
+    @staticmethod
+    def test_assignments():
+        for z in Collection.Z.keys():
+            for x in Collection.Z[z].cells:
+                if len(Cell.C[x].zones) == 0:
+                    print(z, x)
+            t = Collection.Z[z].thresholds
+            for (a,b) in itertools.combinations(t,2):
+                az = Collection.T[a].zones
+                bz = Collection.T[b].zones
+                if z not in az.intersection(bz):
+                    print(z, t, (a,b), (az,bz))
+        for t in Collection.T.keys():
+            print(t, len(Collection.T[t].cells), Collection.T[t].cells)
 
 ################################################################################
 #######################CLASSES DESCRIBING ACTORS: ACTOR, COCKROACHES ###########
 ################################################################################
-
 class Actor(object):
     """
     Definition of the actor.
     """
     A = dict()
-    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), unavailable = set(), actor_type = None, sociability = random.choice([0.5, 0.6,0.7,0.8,0.9,1.0]), friends = set()):
+    def __init__(self, name, x = None, y = None, color = None, zone = None, threshold = None, facing = (1,0), unavailable = set(), actor_type = None, sociability = random.choice([0.5,0.6,0.7,0.8,0.9,1.0]), friends = set(), state = "idle"):
         self.name = name
         self.actor_type = actor_type
         self.friends = friends
         self.sociability = sociability
-        self.in_meeting = False
+        self.state = state #"idle", "in_move", "in_meet", "going_to_meet"
         self.x = x
         self.y = y
         self.color = color
         self.personal_space = set()
         if zone is not None and self.x is None and self.y is None:
             self.initialize_in_zone(zone)
+        if zone is None and (self.x is not None and self.y is not None):
+            self.zone = self.assign_zone()
         self.zone = zone
+        self.prev_zone = None
         Collection.Z[self.zone].actors.add(self.name)
         self.color = color if color is not None else crimson
         self.threshold = threshold
         if self.threshold is not None:
             Collection.T[self.threshold].actors.add(self.name)
         self.facing = facing
-        self.unavailable = set()
+        self.unavailable = unavailable
         self.set_personal_space()
+        self.size = 0
+        self.locations = None
+        self.event = None
         Actor.A[self.name] = self
         Cell.C[(self.x, self.y)].is_occupied = True
+
+    def assign_zone(self):
+        possible = Cell.C[(self.x, self.y)].zones
+        return random.choice(list(possible))
 
     def initialize_in_zone(self, z):
         """
@@ -572,7 +703,13 @@ class Actor(object):
         if ox is not None and oy is not None:
             self.remove_personal_space()
         self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
-        self.zone = Cell.C[(self.x, self.y)].zone
+
+        if len(Cell.C[(self.x, self.y)].zones) == 1:
+            self.zone = list(Cell.C[(self.x, self.y)].zones)[0]
+        elif len(Cell.C[(self.x, self.y)].zones) == 2:
+            self.zone = random.choice(list(Cell.C[(self.x, self.y)].zones))
+            self.threshold = Cell.C[(self.x, self.y)].threshold
+
         if ox is not None and oy is not None:
             Cell.C[(ox, oy)].is_occupied = False
         Cell.C[(self.x, self.y)].is_occupied = True
@@ -610,34 +747,57 @@ class Actor(object):
 
     def move(self, c):
         """
-        Movess actor from current position to a new position c.
+        Moves actor from current position to a new position c.
         """
         ox, oy = self.x, self.y
         cx, cy = c
+        oldzs = Cell.C[(ox,oy)].zones
+        newzs = Cell.C[(cx,cy)].zones
+        #Entering a threshold
+        if len(oldzs) == 1 and len(newzs) == 2:
+            old_z = list(oldzs)[0]
+            new_z = list(newzs.intersection(oldzs))[0]
+
+        #Continuing in the same zone
+        if len(oldzs) == 1 and len(newzs) == 1:
+            old_z = list(oldzs)[0]
+            new_z = list(newzs)[0]
+            if new_z != old_z:
+                print("This should not be possible unless positions are being reset!")
+        #Entering a zone from a threshold
+        if len(oldzs) == 2 and len(newzs) == 1:
+            old_z = list(oldzs.difference(newzs))[0]
+            new_z = list(newzs)[0]
+
+        #Conitnuing in a threshold
+        if len(oldzs) == 2 and len(newzs) == 2:
+            inter = newzs.intersection(oldzs)
+            new_z = list(inter)[0]
+            old_z = new_z
+
+        old_t = Cell.C[(ox,oy)].threshold
+        new_t = Cell.C[(ox,oy)].threshold
+
         if not Cell.C[(cx, cy)].is_occupied:
             self.remove_personal_space()
             self.x, self.y = cx, cy
             self.set_personal_space()
             Cell.C[(ox, oy)].is_occupied = False
             Cell.C[(self.x, self.y)].is_occupied = True
-            old_z = Cell.C[(ox, oy)].zone
-            self.zone = Cell.C[(self.x, self.y)].zone
-
-            # update the zone's information about the actors in it.
-            if old_z != self.zone:
-                if self.zone is not None:
-                    Collection.Z[self.zone].actors.add(self.name)
-                if old_z is not None and self.name in Collection.Z[old_z].actors:
-                    Collection.Z[old_z].actors.remove(self.name)
-
+            self.zone = new_z
+            self.prev_zone = old_z
+            #update the zone's information about actors in it.
+            if self.prev_zone != self.zone:
+                Collection.Z[self.zone].actors.add(self.name)
+                if self.name in Collection.Z[self.prev_zone].actors:
+                    Collection.Z[self.prev_zone].actors.remove(self.name)
             # update the threshold's information about the actors in it.
-            old_t = Cell.C[(ox, oy)].threshold
-            self.threshold = Cell.C[(self.x, self.y)].threshold
-            if old_t != self.threshold:
-                if self.threshold is not None:
-                    Collection.T[self.threshold].actors.add(self.name)
-                if old_t is not None and self.name is Collection.T[old_t].actors:
-                    Collection.T[old_t].actors.remove(self.name)
+            if new_t != old_t:
+                self.threshold = new_t
+                if old_t is not None:
+                    Collection.T[old_t].remove(self.name)
+                if new_t is not None:
+                    Collection.T[new_t].add(self.name)
 
     def kill(self):
         """
@@ -665,10 +825,19 @@ class Actor(object):
         radius = max(min_size, int(Cell.size/2))
         pygame.draw.circle(screen, self.color, center, radius)
 
-        if self.in_meeting:
-            color = gold
-        else:
-            color = tomato
+    def draw_personal_space(self, screen, min_size = 4):
+        """
+        Draws this object in pygame as a circle or radius min_size
+        Requires a screen object.
+        """
+        if self.state == "idle":
+            color = lightgrey
+        if self.state == "in_move":
+            color = teal
+        if self.state == "in_meet":
+            color = salmon
+        if self.state == "going_to_meet":
+            color = orange
 
         for c in self.personal_space:
             Cell.C[c].draw(screen, drawing_type = "graph", color = color)
@@ -681,6 +850,9 @@ class Actor(object):
         The minimum size of each actor can be specified in min_size.
         """
         for a in Actor.A:
+            Actor.A[a].draw_personal_space(screen, min_size=min_size)
+
+        for a in Actor.A:
             Actor.A[a].draw(screen, min_size = min_size)
 
     @staticmethod
@@ -690,16 +862,132 @@ class Actor(object):
                 c = Actor.A[a].x, Actor.A[a].y
                 print(Cell.C[c].zones)
 
+    @staticmethod
+    def possible_unscheduled(group):
+        """
+        If two or more actors which are in idle or in_move states
+        are in the same zone, a meeting between them is possible.
+        """
+        zones = defaultdict(list)
+        for a in group:
+            if Actor.A[a].event == None:
+                zone = Actor.A[a].zone
+                zones[zone].append(a)
+        possible_meetings = list()
+        for zone in zones:
+            if len(zones[zone]) > 1:
+                zones[zone] = tuple(sorted(zones[zone]))
+                possible_meetings.append((zone, zones[zone]))
+        return possible_meetings
+
+class Cockroach:
+    Roaches = list()
+    Poison = defaultdict(int)
+
+    def __init__(self, x, y, r, poison, color):
+        self.x = x
+        self.y = y
+        self.r = r
+        self.poison = poison
+        self.color = color
+        Cockroach.Poison[(x, y)] = 0
+        Cockroach.Roaches.append(self)
+
+    @staticmethod
+    def total_poison():
+        return sum(Cockroach.Poison.values())
+
+    def draw_cockroach(self, screen):
+        center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
+        radius = Cell.size // 2
+        pygame.draw.circle(screen, self.color, center, radius)
+
+    def move_antidote_intelligently(self):
+        """The cleaner cockroaches do not perform random walks. Instead they move to the worst infested cell."""
+
+        if self.poison <= 0:
+            target = [(Cockroach.Poison[i],i) for i in Cell.C[(self.x, self.y)].nbrs if not Cell.C[(self.x, self.y)].is_barrier]
+            total_poison = sum([j[0] for j in target])
+            if total_poison > 0:
+                target = random.choice([i for i in target if i == max(target)])
+                self.x, self.y = target[1][0], target[1][1]
+            else:
+                self.x, self.y = random.choice(Cell.C.keys())
+            Cockroach.Poison[(self.x, self.y)] += self.poison
+            if Cockroach.Poison[(self.x, self.y)] < 0:
+                Cockroach.Poison[(self.x, self.y)] = 0
+
+    def move_antidote_randomly(self):
+        """Cockroach performs a random walk depositing poison, moving poison (positive or negative) from cell to cell."""
+        if self.poison <= 0:
+            options = -1, 0, 1
+            x = random.choice(options)
+            y = random.choice(options)
+            old_x, old_y = self.x, self.y
+            new_x, new_y = self.x + x, self.y + y
+            if (new_x, new_y) in Cell.C.keys() and not Cell.C[(new_x, new_y)].is_barrier:
+                if self.poison > 0:
+                    Cockroach.Poison[(old_x, old_y)] -= (self.poison - 1)
+                    if Cockroach.Poison[(old_x, old_y)] < 0:
+                        Cockroach.Poison[(old_x, old_y)] = 0
+                self.x, self.y = new_x, new_y
+                Cockroach.Poison[(new_x, new_y)] += self.poison
+                if Cockroach.Poison[(new_x, new_y)] < 0:
+                    Cockroach.Poison[(new_x, new_y)] = 0
+
+    def move_cockroach_intelligently(self):
+        """The cleaner cockroaches do not perform random walks. Instead they move to the worst infested cell."""
+        if self.poison > 0:
+            options = -1, 0, 1
+            x = random.choice(options)
+            y = random.choice(options)
+            old_x, old_y = self.x, self.y
+            new_x, new_y = self.x + x, self.y + y
+            if (new_x, new_y) in Cell.C.keys() and not Cell.C[(new_x, new_y)].is_barrier:
+                Cockroach.Poison[(old_x, old_y)] -= (self.poison - 1)
+                if Cockroach.Poison[(old_x, old_y)] < 0:
+                    Cockroach.Poison[(old_x, old_y)] = 0
+                self.x, self.y = new_x, new_y
+                Cockroach.Poison[(new_x, new_y)] += self.poison
+                if Cockroach.Poison[(new_x, new_y)] < 0:
+                    Cockroach.Poison[(new_x, new_y)] = 0
+
+    def move_cockroach_randomly(self):
+        """Cockroach performs a random walk depositing poison, moving poison (positive or negative) from cell to cell."""
+        if self.poison > 0:
+            options = -1, 0, 1
+            x = random.choice(options)
+            y = random.choice(options)
+            old_x, old_y = self.x, self.y
+            new_x, new_y = self.x + x, self.y + y
+            if (new_x, new_y) in Cell.C.keys() and not Cell.C[(new_x, new_y)].is_barrier:
+                if self.poison > 0:
+                    Cockroach.Poison[(old_x, old_y)] -= (self.poison - 1)
+                    if Cockroach.Poison[(old_x, old_y)] < 0:
+                        Cockroach.Poison[(old_x, old_y)] = 0
+                self.x, self.y = new_x, new_y
+                Cockroach.Poison[(new_x, new_y)] += self.poison
+                if Cockroach.Poison[(new_x, new_y)] < 0:
+                    Cockroach.Poison[(new_x, new_y)] = 0
+
 class Target:
     """Defines a target cell. Target cells are not occupied."""
     T = dict()
-    def __init__(self, name, x = None, y = None, zone = None):
+    def __init__(self, name, size=9, x = None, y = None, zone = None):
         self.x = x
         self.y = y
         self.name = name
+        self.size = size #1,4,9 or 16 cells - 1x1, 2x2, 3x3 or 4x4
         self.zone = zone
+        self.personal_space = set()
+        self.locations = set()
+        self.current = None
+        if self.x is not None and self.y is not None:
+            self.set_personal_space()
         if self.x is None and self.y is None:
             self.initialize()
+        self.current_event = None
+        self.exclusive = False
         Target.T[self.name] = self
 
     def initialize(self):
@@ -715,11 +1003,51 @@ class Target:
             possible_zones = [i for i in Collection.Z.keys()]
             self.zone = random.choice(possible_zones)
             self.x, self.y = random.choice([i for i in list(options) if not Cell.C[i].is_occupied])
+        self.set_personal_space()
+
+    def draw_target(self, screen):
+        for c in self.locations:
+            Cell.C[c].draw(screen, color=chocolate)
+
+    def set_personal_space(self):
+        """
+        Sets the personal space of the target in current position.
+        Currently, personal space is the Moore neighbourhood of the current position.
+        """
+        x,y = self.x, self.y
+        cells = list()
+        if self.size == 1:
+            cells.append((x,y))
+        if self.size == 4:
+            possibles = [comb for comb in itertools.combinations(Cell.C[(x,y)].nbrs,4) if (x,y) in comb]
+        if self.size == 9:
+            possibles = Cell.C[(x,y)].nbrs
+        for c in possibles:
+            for d in Cell.C[c].nbrs:
+                if not Cell.C[d].is_barrier:
+                    if Cell.C[d].in_threshold or Cell.C[d].in_zone:
+                        self.personal_space.add(c)
+        self.locations = set(possibles)
+
+    def available(self, apart_from = set()):
+        """
+        Returns whether or not a target is available.
+        """
+        z = self.zone
+        actors_in_zone = Collection.Z[z].actors
+        other_actors = actors_in_zone.difference(apart_from)
+        locations = {(Actor.A[i].x, Actor.A[i].y) for i in other_actors}
+        in_target = locations.intersection(self.locations)
+        return len(in_target) == 0
+
+    @staticmethod
+    def draw_all_targets(screen):
+        for t in Target.T:
+            Target.T[t].draw_target(screen)
 
 ################################################################################
 ######## CLASSES FOR SEARCH ####################################################
 ################################################################################
-
 class PriorityQueue:
     """
     A wrapper class around python's heapq class.
@@ -785,11 +1113,16 @@ class Search:
         Ignores cells in the ignore set if specified.
         Ignores occupied cells.
         """
+        #print(sorted(list(Collection.TG.keys()), key=itemgetter(0,1)))
+        #print(sorted(list(self.graph.keys()),key=itemgetter(0,1)))
         self.open_cells.put(self.start, 0)
         self.came_from[self.start] = None
         self.cost_so_far[self.start] = 0
         while not self.open_cells.empty():
             current = self.open_cells.get()
+            if current == self.goal:
+                self.came_from[self.goal] = current
+                break
             if current in self.graph[self.goal]:
                 self.came_from[self.goal] = current
                 break
@@ -843,7 +1176,7 @@ class Search:
         """
         draw_this = [Cell.C[p].rect.center for p in self.path]
         if len(draw_this) > 1:
-            pygame.draw.lines(screen, color, False, draw_this, 1)
+            pygame.draw.aalines(screen, color, False, draw_this, 1)
 
 ######################################################################################################
 ###################################### EVENT CLASSES #################################################
@@ -889,20 +1222,66 @@ class Move:
     def __init__(self, actor, target, screen, graph=dict(), unavailable=set()):
         self.actor = actor
         self.target = target
+        self.target_location = self.process_target(target)
         self.screen = screen
         self.graph = graph
         self.unavailable = unavailable
+        self.unavailable = self.unavailable.union(self.actor.unavailable)
         self.done = self.check_done()
-        self.go()
+        if self.done:
+            self.actor.state = "idle"
+        if not self.done:
+            self.go()
+
+
+    def min_dist(self, a, b):
+        """
+        Returns the smallest distance between cells a and b.
+        Orthogonals and diagonals are considered.
+        """
+        x1, y1 = a
+        x2, y2 = b
+        if abs(y2 - y1) > abs(x2 - x1):
+            return 1.4142 * abs(x2 - x1) + 1.0 *abs((abs(y2 - y1) - abs(x2 - x1)))
+        elif abs(y2 - y1) < abs(x2 - x1):
+            return 1.4142 * abs(y2 - y1) + 1.0 *abs((abs(y2 - y1) - abs(x2 - x1)))
+        elif abs(y2 - y1) == abs (x2 - x1):
+            return 1.4142 * abs(y2 - y1)
+
+    def process_target(self, target):
+        if target.size > 1 and type(target.locations) is set:
+            apos = self.actor.x, self.actor.y
+            distances = list()
+            for tpos in target.locations:
+                if not Cell.C[tpos].is_occupied:
+                    distances.append((self.min_dist(apos,tpos), tpos))
+            if len(distances) >= 2:
+                answer = random.choice(sorted(distances, key=itemgetter(0))[:2])[1]
+            elif len(distances) == 1:
+                answer = distances[0][1]
+            elif len(distances) == 0:
+                answer = random.choice(list(target.locations))
+            return answer
+        else:
+            return target.x, target.y
+
 
     def check_done(self):
-        return (self.actor.x, self.actor.y) in Cell.C[(self.target.x, self.target.y)].nbrs
+        if type(self.target) == Target:
+            return (self.actor.x, self.actor.y) == (self.target.x, self.target.y)
+        elif type(self.target) == Actor:
+            tz = Cell.C[(self.target.x, self.target.y)].nbrs
+            return (self.actor.x, self.actor.y) in tz
+
 
     def go(self, ignore=set()):
-        if not self.actor.in_meeting:
+        if self.actor.state in ("going_to_meet", "idle", "in_move"):
             if self.actor.zone == self.target.zone:
-                ZS = self.zone_search((self.actor.x, self.actor.y), (self.target.x, self.target.y), ignore=ignore)
+                #print(self.actor.name, (self.actor.x, self.actor.y), self.target_location)
+                ZS = self.zone_search((self.actor.x, self.actor.y), self.target_location, ignore=ignore)
                 if ZS.path is not None and len(ZS.path) > 1:
+                    if self.actor.state != "going_to_meet":
+                        self.actor.state = "in_move"
                     ZS.draw_route(self.screen, color=red)
                     self.actor.move(ZS.path[1])
                     ZS.path.pop(0)
@@ -910,7 +1289,9 @@ class Move:
             elif self.actor.zone != self.target.zone:
                 S = self.threshold_search()
                 if S.path is not None:
-                    S.draw_route(self.screen, color=verylightgrey)
+                    if self.actor.state != "going_to_meet":
+                        self.actor.state = "in_move"
+                    S.draw_route(self.screen, color=black)
                     ZS = self.zone_search(S.path[0], S.path[1], ignore=ignore)
                     if ZS.path is None:
                         ignore.add(S.path[1])
@@ -919,6 +1300,8 @@ class Move:
                             ZS = self.zone_search(S.path[0], options[0], ignore=ignore)
 
                     if ZS.path is not None:
+                        if self.actor.state != "going_to_meet":
+                            self.actor.state = "in_move"
                         ZS.draw_route(self.screen, color=red)
                         self.actor.move(ZS.path[1])
                         ZS.path.pop(0)
@@ -926,7 +1309,10 @@ class Move:
     def threshold_search(self, ignore=set()):
         A = self.actor.x, self.actor.y
         B = self.target.x, self.target.y
-
+        AZ = Cell.C[A].zones
+        AZ = list(AZ)[0]
+        BZ = Cell.C[B].zones
+        BZ = list(BZ)[0]
         #Avoid stepping into other actors' personal space.
         for actor in Actor.A.keys():
             if actor != self.actor.name and actor != self.target.name:
@@ -938,16 +1324,15 @@ class Move:
                     if len(intersect) > 0:
                         ignore = ignore.union(intersect)
 
-
         #Avoid using zones which are unavailable.
         for u in self.unavailable:
             for c in Collection.Z[u].threshold_cells:
                 ignore.add(c)
 
         if A not in self.graph:
-            self.graph[A] = [i for i in Collection.Z[Cell.C[A].zone].threshold_cells]
+            self.graph[A] = [i for i in Collection.Z[AZ].threshold_cells]
         if B not in self.graph:
-            self.graph[B] = [i for i in Collection.Z[Cell.C[B].zone].threshold_cells]
+            self.graph[B] = [i for i in Collection.Z[BZ].threshold_cells]
 
         return Search(A, B, graph=self.graph, ignore=ignore)
 
@@ -955,111 +1340,274 @@ class Move:
         zone = self.get_zone(a, b)
         if zone is None:
             print("Valid zone was not returned!")
+            print(a, Cell.C[a].zones)
+            print(b, Cell.C[b].zones)
         for actor in Collection.Z[zone].actors:
             if actor != self.actor.name and actor != self.target.name:
-                ignore = ignore.union(Actor.A[actor].personal_space)
+                if actor in Actor.A.keys():
+                    ignore = ignore.union(Actor.A[actor].personal_space)
 
         return Search(a, b, graph=Collection.Z[zone].graph, ignore=ignore)
 
     def get_zone(self, start, target):
-        if not Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
-            if Cell.C[start].zone is not None:
-                return Cell.C[start].zone
-            elif Cell.C[start].zone is None and Cell.C[target].zone is not None:
-                return Cell.C[target].zone
-            else:
-                return list(Cell.C[start].zones.intersection(Cell.C[target].zones))[0]
-
-        elif Cell.C[start].zones.isdisjoint(Cell.C[target].zones):
-            if Cell.C[start].zone is not None:
-                return Cell.C[start].zone
-            if Cell.C[target].zone is not None:
-                return Cell.C[target].zone
-
-class Unplanned:
-    """
-    Checks all the actors for all possible meetings between 2 actors.
-    The conditions required to satisfy a meeting are:
-    1. both actors in question should not be in a meeting.
-    2. the actors' personal space should overlap.
-    """
-    M = dict()
-    Completed = set()
-    def __init__(self, ID, actors=set(), duration=25, status="not_initialized"):
-        """
-        Initialize a meeting object
-        """
-        self.ID = ID
-        self.actors = actors
-        self.duration = duration
-        self.status = status
-        self.state = 0
-        Unplanned.M[self.ID] = self
-
-    def update(self, step = 1):
-        """
-        Update the status of a meeting.
-        The status is an integer.
-        If the status is equal to the assigned duration,
-        the status of the meeting is changed to 'completed'.
-        If status is greater than zero and less and duration,
-        the status of the meeting is 'in_progress'.
-        """
-        self.state += step
-        if self.state < self.duration:
-            self.status = "in_progress"
-        elif self.state >= self.duration:
-            self.status = "completed"
+        sz = Cell.C[start].zones
+        tz = Cell.C[target].zones
+        common = sz.intersection(tz)
+        if len(common) >= 1:
+            return list(common)[0]
         else:
-            self.status = "not_initialized"
+            return None
 
-    def report_status(self):
-        """ Report current status of the meeting."""
-        return self.status
+    def evaluate(self):
+        pass
 
-    @staticmethod
-    def check_all():
-        """
-        Check the status of all meetings in the meeting dictionary.
-        """
-        for a in Actor.A:
-            if not Actor.A[a].in_meeting:
-                for b in Actor.A[a].friends:
-                    if not Actor.A[b].in_meeting:
-                        if not Actor.A[a].personal_space.isdisjoint(Actor.A[b].personal_space):
-                            m = "_".join(sorted([a,b]))
-                            if m not in Unplanned.Completed:
-                                if 0.5*(Actor.A[a].sociability + Actor.A[b].sociability) > 0.3:
-                                    meet = Unplanned(m, actors = {a, b}, duration = random.choice(list(range(5, 50))), status = "not_initialized")
-                                    Unplanned.M[meet.ID] = meet
-                                    Actor.A[a].in_meeting = True
-                                    Actor.A[b].in_meeting = True
+class Meet:
+    M = dict()
+    def __init__(self, ID, current_participants = list(), zone = None, target = None, space = set(), state = "not_initialized", start_at = 0, progress = 0, duration = random.choice(range(25,36))):
+        if len(current_participants) < 2:
+            print("At least two actors are required for a meeting to occur. Less than two have been specified.")
+            return
+        self.ID = ID
+        self.current_participants = current_participants #expected participants of a scheduled meeting, actual participants in any meeting.
+        self.zone = zone
+        self.target = target
+        self.state = state  #possible states: "not_initialized", "in_progress", "completed", "suspended"
+        self.start_at = start_at
+        self.progress = progress #timesteps towards duration.
+        self.duration = duration #scheduled length of the meeting.
+        self.space = space
+        Meet.M[self.ID] = self
 
+    def locate(self):
+        """
+        This function locates a meeting given the information specified.
+        Possibilities covered:
+            zone and target both not specified.
+            zone specified, target not specified.
+            zone not specified target specified.
+            zone and target both specified.
+        Where it is relevant, the current position of the participants (current_participants)
+        is taken into account.
+        """
+        zones = {Actor.A[i].zone for i in self.current_participants}
+        if len(zones) < 1:
+            print("None of the actors appear to be in a zone:", (self.ID, self.zone, self.current_participants))
+            return
 
-    @staticmethod
-    def update_all():
+        if self.zone is None and self.target is None: #intention is for actors to meet somewhere.
+            self.target_specified = False
+            if len(zones) == 1:
+                self.zone = list(zones)[0]
+                tx,ty = self.centroid()
+                self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+
+            elif len(zones) > 1: #bad input - in this case zone and target are both not specified and actors are scattered across zones.
+                print("Meeting not possible.")
+                return
+
+        elif self.zone is None and self.target is not None: #intention is for actors to meet at a given location, but zone has been neglected.
+            self.target_specified = True
+            self.zone = self.target.zone #simply update zone
+            #it doesn't really matter where the actors currently are.
+
+        elif self.zone is not None and self.target is None: #intention is for actors to meet somewhere in a given zone.
+            self.target_specified = False
+            if len(zones) == 1:
+                if self.zone == list(zones)[0]: #all participants are in the intended zone.
+                    tx,ty = self.centroid()
+                    self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+                elif self.zone != list(zones)[0]: #all participants are in a single zone, but it is not the intended zone.
+                    tx, ty = Collection.Z[self.zone].center_cell
+                    self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+            elif len(zones) > 1: #all participants are scattered in more than one zone
+                tx, ty = Collection.Z[self.zone].center_cell
+                self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+
+        elif self.zone is not None and self.target is not None:
+            self.target_specified = True
+
+    def centroid(self):
+        xs,ys = list(), list()
+        for p in self.current_participants:
+            px,py = Actor.A[p].x, Actor.A[p].y
+            xs.append(px)
+            ys.append(py)
+        tx = int(round(1.0*sum(xs)/len(xs),0))
+        ty = int(round(1.0*sum(ys)/len(ys),0))
+        return tx,ty
+
+    def update(self):
+        if self.spatial_conditions():
+            if self.state == "in_progress" and self.progress < self.duration:
+                self.progress += 1
+                return None
+            elif self.state == "in_progress" and self.progress == self.duration:
+                self.state = "completed"
+                z = self.zone
+                p = tuple(sorted(self.current_participants))
+                self.kill()
+                return z,p
+
+    def start(self):
+        for p in self.current_participants:
+            self.space = self.space.union(Actor.A[p].personal_space)
+            Actor.A[p].state = "in_meet"
+        self.state = "in_progress"
+        self.progress += 1
+
+    def spatial_conditions(self):
+        if len(self.current_participants) <= 1:
+            return False
+        else:
+            satisfied = True
+            for p in self.current_participants:
+                if not (satisfied and (Actor.A[p].x, Actor.A[p].y) in self.target.locations):
+                    return False
+            return satisfied
+
+    def proceed(self,screen):
+        if len(self.current_participants) < 2:
+            return False
+        if self.state == "not_initialized":
+            if self.spatial_conditions():
+                self.start()
+            else:
+
+                provide = dict()
+                for p in self.current_participants:
+                    Actor.A[p].state = "going_to_meet"
+                    available_locations = [i for i in self.target.locations if not Cell.C[i].is_occupied]
+                    if len(available_locations) > 0:
+                        x,y = random.choice(available_locations)
+                        provide[p] = x,y
+                    else:
+                        print("Location is not available")
+
+                for p in provide:
+                    self.target.x, self.target.y = provide[p]
+                    Move(Actor.A[p], self.target, screen, graph=Collection.TG, unavailable=Actor.A[p].unavailable)
+
+        elif self.state == "in_progress":
+            self.update()
+
+    def kill(self):
+        self.current_participants = list(self.current_participants)
+        while self.current_participants:
+            p = self.current_participants.pop()
+            Actor.A[p].state = "idle"
+            Actor.A[p].event = None
+        del self
+
+    def add_participant(self, p, screen):
+        Actor.A[p].state = "going_to_meet"
+        Move(Actor.A[p],self.target,screen,graph=Collection.TG,unavailable=Actor.A[p].unavailable)
+        if (Actor.A[p].x, Actor.A[p].y) in self.target.locations:
+            self.current_participants.add(p)
+            Actor.A[p].state = "in_meet"
+
+class Event:
+    """
+    Describes an event.
+    An event is an entity involving one of more actors completing one or more tasks in a given sequence.
+    """
+    E = dict()
+    def __init__(self, name):
+        self.name = name
+        self.steps = list()#a sequence of steps
+        self.current_stage = 0 #total number of stages = len(steps), current step = current index of the list steps
+        self.stages = len(self.steps)
+        Event.E[self.name] = self
+
+    def add_step(self, step):
+        self.steps.append(step)
+        self.stages = len(self.steps)
+
+    def execute(self, screen):
+        if self.current_stage < self.stages:
+            self.steps[self.current_stage].proceed(screen)
+            if self.steps[self.current_stage].state == "completed":
+                self.current_stage += 1
+
+    def report(self):
+        for s in self.steps:
+            for a in s.actors:
+                print(Actor.A[a].state)
+
+class Step:
+    S = dict()
+    def __init__(self, name, event, actors = set(), target = None, duration = random.choice(range(10,40))):
+        self.name = name
+        self.event = event
+        self.actors = actors
+        self.target = target #Target object
+        self.duration = duration
+        self.state = "not_initialized" #possible states "not_initialized", "in_progress", "completed"
+        self.progress = 0
+        self.me = None
+        self.mo = None
+        Step.S[(self.name,self.event)] = self
+
+    def update(self):
+        if self.state == "in_progress" and self.progress < self.duration:
+            self.progress += 1
+            print(self.event, self.progress, self.duration)
+        elif self.state == "in_progress" and self.progress == self.duration:
+            self.state = "completed"
+            while self.actors:
+                p = self.actors.pop()
+                Actor.A[p].event = None
+                Actor.A[p].state = "idle"
+
+    def start(self):
+        if self.state == "not_initialized" and self.tests():
+            self.progress += 1
+            self.state = "in_progress"
+
+    def tests(self):
+        return self.spatial_test() and self.social_test()
+
+    def spatial_test(self):
         """
-        Updates the status of all events stored in the Unplanned.M dictionary.
-        If an event is complete, it is destroyed. The status of Actors in the meeting
-        is set to False.
+        Checks to see two things:
+            1. All actors in the current step are in the target.
+            2. No other actors are in the target.
         """
-        remove = set()
-        if len(Unplanned.M) > 0:
-            for m in Unplanned.M.keys():
-                if Unplanned.M[m].status == "completed":
-                    Unplanned.Completed.add(m)
-                    for a in Unplanned.M[m].actors:
-                        Actor.A[a].in_meeting = False
-                    remove.add(m)
+        locations = set()
+        for a in self.actors:
+            x,y = Actor.A[a].x, Actor.A[a].y
+            locations.add((x,y))
+        return self.target.available(apart_from = self.actors) and locations.issubset(self.target.locations)
+
+    def social_test(self):
+        result = True
+        for a in self.actors:
+            if Actor.A[a].event != self.event:
+                result = False
+        return result
+
+    def proceed(self, screen):
+        if self.tests():
+            if self.state == "not_initialized" and self.progress == 0:
+                self.start()
+            elif self.state == "in_progress":
+                self.update()
+        else:
+            if not self.me:
+                if len(Meet.M) > 0:
+                    me = [int(i) for i in Meet.M.keys() if i.isdigit()]
+                    if len(me) > 0:
+                        me = max(me)
+                    else:
+                        me = 0
                 else:
-                    Unplanned.M[m].update()
-        for r in remove:
-            del Unplanned.M[r]
-
-class Room:
-    def __init__(self, zones = set()):
-        self.__zones = zones
-
-
-
+                    me = 0
+                me += 1
+                self.me = Meet(str(me), current_participants = self.actors, zone = self.target.zone, target = self.target, duration = 1)
+                self.me.proceed(screen)
+            else:
+                self.me.proceed(screen)
+            if self.me.state == "in_progress":
+                for a in self.actors:
+                    if Actor.A[a].event is None:
+                        Actor.A[a].event = self.event
 

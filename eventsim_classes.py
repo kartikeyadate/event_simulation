@@ -32,8 +32,8 @@ class Cell:
                    (x + 1, y + 1), (x + 1, y - 1), (x - 1, y + 1), (x - 1, y - 1)]
         nbrs = [r for r in results if r in Cell.C.keys()]
         return nbrs
-  
-   
+
+
     def draw_cell(self, screen, drawing_type = None, color = None):
         r = max(2, int(Cell.size/2.5))
         if color is None:
@@ -51,14 +51,14 @@ class Cell:
             pygame.draw.circle(screen, color, (self.x * self.s + int(self.s/2), self.y * self.s + int(self.s/2)), r)
         if drawing_type == "grid":
             pygame.draw.rect(screen, color, self.rect, 1)
-    
+
     def draw_acceptable(self, screen, color, drawing_type = None):
         r = max(2, int(Cell.size/2.5))
         if drawing_type == "graph":
             pygame.draw.circle(screen, color, (self.x * self.s + int(self.s/2), self.y * self.s + int(self.s/2)), r)
         if drawing_type == "grid":
             pygame.draw.rect(screen, color, self.rect, 1)
-                   
+
     def highlight_cell(self, screen, color, drawing_type = None):
         """Highlight current instance of cell on the screen with color c using drawing type grid or graph"""
         r = max(2, int(Cell.size/2.5))
@@ -70,10 +70,10 @@ class Cell:
     def is_orthogonal_neighbour(self, c):
         """Returns true if c is an orthogonal neighbour of the current cell instance"""
         return c in [(self.x + 1, self.y), (self.x - 1, self.y), (self.x, self.y + 1), (self.x, self.y - 1)]
-    
+
     def is_diagonal_neighbour(self, c):
         """Returns true if c is a diagonal neighbour of the current cell instance"""
-        return c in [(self.x + 1, self.y + 1), (self.x - 1, self.y + 1), (self.x - 1, self.y - 1), (self.x + 1, self.y - 1)]    
+        return c in [(self.x + 1, self.y + 1), (self.x - 1, self.y + 1), (self.x - 1, self.y - 1), (self.x + 1, self.y - 1)]
 
     @staticmethod
     def assign_neighbours():
@@ -86,7 +86,7 @@ class Cell:
         for i in range(int(w/s)):
             for j in range(int(h/s)):
                 Cell(i, j, s)
-        Cell.assign_neighbours()            
+        Cell.assign_neighbours()
 
 
     @staticmethod
@@ -112,11 +112,11 @@ class Cell:
                 g = 1.0*g/(s*s)
                 b = 1.0*b/(s*s)
                 rgbvals[(i,j)] = (r, g, b)
-                
+
         for i in range(int(w/s)):
             for j in range(int(h/s)):
                 Cell(i, j, s)
-                
+
         for c in Cell.C:
             x1, y1 = Cell.C[c].rect.topleft
             x2, y2 = Cell.C[c].rect.bottomright
@@ -130,8 +130,8 @@ class Cell:
                 distances.append((coldist(Cell.C[c].color, spaces[k]), spaces[k]))
             closest = sorted(distances, key = itemgetter(0))[0]
             Cell.C[c].color = closest[1]
-        pass            
-        
+        pass
+
 
 class Zone:
     Z = dict()
@@ -150,10 +150,10 @@ class Zone:
 
         for c in self.threshold_cells:
             if Cell.C[c].is_barrier:
-                Cell.C[c].highlight_cell(screen, steelblue, drawing_type = drawing_type)            
+                Cell.C[c].highlight_cell(screen, steelblue, drawing_type = drawing_type)
             if not Cell.C[c].is_barrier:
                 Cell.C[c].highlight_cell(screen, darkgreen, drawing_type = drawing_type)
-        
+
     def make_walls(self):
         xs = [x[0] for x in list(self.cells.keys())]
         ys = [x[1] for x in list(self.cells.keys())]
@@ -164,21 +164,21 @@ class Zone:
             Cell.C[(i,y_min - 1)].in_threshold = True
             Cell.C[(i,y_max + 1)].in_threshold = True
             self.threshold_cells.append((i, y_min - 1))
-            self.threshold_cells.append((i, y_max + 1))        
+            self.threshold_cells.append((i, y_max + 1))
             t1.append((i, y_min - 1))
             t2.append((i, y_max + 1))
         self.thresholds.append(sorted(t1, key = itemgetter(0)))
-        self.thresholds.append(sorted(t2, key = itemgetter(0)))        
+        self.thresholds.append(sorted(t2, key = itemgetter(0)))
         t1, t2 = list(), list()
         for i in range(y_min - 1, y_max + 2, 1):
             Cell.C[(x_min - 1, i)].in_threshold = True
             Cell.C[(x_max + 1, i)].in_threshold = True
-            self.threshold_cells.append((x_min - 1, i))    
+            self.threshold_cells.append((x_min - 1, i))
             self.threshold_cells.append((x_max + 1, i))
             t1.append((x_min - 1, i))
             t2.append((x_max + 1, i))
         self.thresholds.append(sorted(t1, key = itemgetter(1)))
-        self.thresholds.append(sorted(t2, key = itemgetter(1)))        
+        self.thresholds.append(sorted(t2, key = itemgetter(1)))
 
     def refine_thresholds(self):
         for t in self.thresholds:
@@ -192,7 +192,7 @@ class Zone:
                     Cell.C[c].is_barrier = True
                 for c in t[len(t)//2 + 2:]:
                     Cell.C[c].is_barrier = True
-                    
+
         for t in self.thresholds:
             for c in t:
                 if not Cell.C[c].is_barrier:
@@ -203,14 +203,14 @@ class Zone:
                 self.threshold_cells.remove(c)
             if not Cell.C[c].is_barrier:
                 Cell.C[c].zones.add(self.ID)
-                
+
     def make_search_graph(self):
         cells = list(self.cells.keys()) + list(self.threshold_cells)
         cells = list(set(cells))
         for c in cells:
             self.graph[c] = [i for i in Cell.C[c].neighbours() if not Cell.C[i].is_barrier and (i in cells)]
             Cell.C[c].nbrs = self.graph[c]
-    
+
 
 ################################################################################
 #### ACTOR CLASSES #############################################################
@@ -229,7 +229,7 @@ class Actor:
             self.initialize_in_zone(zone)
         self.color = color if color is not None else crimson
         self.zone = zone
-        self.personal_space = self.update_personal_space()            
+        self.personal_space = self.update_personal_space()
         Actor.A[self.name] = self
         Cell.C[(self.x, self.y)].is_occupied = True
 
@@ -250,7 +250,7 @@ class Actor:
             else:
                 ps = set(Cell.C[(self.x, self.y)].nbrs)
         return ps
-   
+
 
     def initialize_in_zone(self, z):
         options = set(Zone.Z[z].cells.keys())
@@ -260,23 +260,23 @@ class Actor:
         if old_x is not None and old_y is not None:
             self.move(random.choice(options))
         else:
-            self.x, self.y = random.choice(options)                        
+            self.x, self.y = random.choice(options)
         if old_x is not None and old_y is not None:
             Cell.C[(old_x, old_y)].is_occupied = False
         Cell.C[(self.x, self.y)].is_occupied = True
-        
+
 
     def print_pos(self):
         print(self.name,":",self.x, self.y)
-                
+
     def draw_actor(self, screen):
         center = self.x*Cell.size + Cell.size // 2, self.y*Cell.size + Cell.size // 2
 #        cx, cy, cz = max(self.color[0]//2, 0), max(self.color[1]//2, 0), max(self.color[2]//2, 0)
         radius = Cell.size // 2
 #        a, b = Cell.size*2, Cell.size
 #        pygame.draw.ellipse(screen, (cx, cy, cz), (center[0], center[1], a, b))
-        pygame.draw.circle(screen, self.color, center, radius)        
-    
+        pygame.draw.circle(screen, self.color, center, radius)
+
     def move(self, c):
         old = self.x, self.y
         cx, cy = c
@@ -290,7 +290,7 @@ class Actor:
                 Cell.C[i].in_meeting = False
             Cell.C[c].is_occupied = True
         self.personal_space = self.update_personal_space()
-        
+
     def check_meeting(self):
         positions = {(Actor.A[i].x, Actor.A[i].y) for i in self.friends}
         x, y = self.x, self.y
@@ -316,7 +316,7 @@ class Actor:
                     if not Cell.C[c].is_barrier:
                         Cell.C[c].in_meeting = True
     """
-    
+
     @staticmethod
     def reset_meeting_status():
         positions = set([(Actor.A[i].x, Actor.A[i].y) for i in Actor.A])
@@ -341,7 +341,7 @@ class Actor:
         actors = set(list(Actor.A.keys()))
         for a in Actor.A:
             Actor.A[a].friends = actors
-            
+
 
     def move_with_keys(self, key):
         pass
@@ -358,7 +358,7 @@ class Cockroach:
         self.color = color
         Cockroach.Poison[(x, y)] = 0
         Cockroach.Roaches.append(self)
-    
+
     @staticmethod
     def total_poison():
         return sum(Cockroach.Poison.values())
@@ -371,7 +371,7 @@ class Cockroach:
 
     def move_antidote_intelligently(self):
         """The cleaner cockroaches do not perform random walks. Instead they move to the worst infested cell."""
-                   
+
         if self.poison <= 0:
             target = [(Cockroach.Poison[i],i) for i in Cell.C[(self.x, self.y)].nbrs if not Cell.C[(self.x, self.y)].is_barrier]
             total_poison = sum([j[0] for j in target])
@@ -387,7 +387,7 @@ class Cockroach:
     def move_antidote_randomly(self):
         """Cockroach performs a random walk depositing poison, moving poison (positive or negative) from cell to cell."""
         if self.poison <= 0:
-            options = -1, 0, 1        
+            options = -1, 0, 1
             x = random.choice(options)
             y = random.choice(options)
             old_x, old_y = self.x, self.y
@@ -406,7 +406,7 @@ class Cockroach:
     def move_cockroach_intelligently(self):
         """The cleaner cockroaches do not perform random walks. Instead they move to the worst infested cell."""
         if self.poison > 0:
-            options = -1, 0, 1        
+            options = -1, 0, 1
             x = random.choice(options)
             y = random.choice(options)
             old_x, old_y = self.x, self.y
@@ -419,11 +419,11 @@ class Cockroach:
                 Cockroach.Poison[(new_x, new_y)] += self.poison
                 if Cockroach.Poison[(new_x, new_y)] < 0:
                     Cockroach.Poison[(new_x, new_y)] = 0
-            
+
     def move_cockroach_randomly(self):
         """Cockroach performs a random walk depositing poison, moving poison (positive or negative) from cell to cell."""
         if self.poison > 0:
-            options = -1, 0, 1        
+            options = -1, 0, 1
             x = random.choice(options)
             y = random.choice(options)
             old_x, old_y = self.x, self.y
@@ -437,14 +437,14 @@ class Cockroach:
                 Cockroach.Poison[(new_x, new_y)] += self.poison
                 if Cockroach.Poison[(new_x, new_y)] < 0:
                     Cockroach.Poison[(new_x, new_y)] = 0
-                               
-            
+
+
 ################################################################################
 ######## CLASSES FOR SEARCH ####################################################
 ################################################################################
 
 class PriorityQueue:
-    """A wrapper class around python's heapq class. 
+    """A wrapper class around python's heapq class.
        An instance of this class
        is used to store the list of open cells."""
 
@@ -468,7 +468,7 @@ class PriorityQueue:
 
 
 class Search:
-   
+
     def __init__(self, start, goal, graph = None, threshold = None):
         self.start = start
         self.goal = goal
@@ -498,7 +498,7 @@ class Search:
             if current in self.graph[self.goal]:
                 self.came_from[self.goal] = current
                 break
-            #Avoid occupied cells.                
+            #Avoid occupied cells.
             neighbours = (i for i in self.graph[current] if not Cell.C[i].is_occupied)
             neighbours = (i for i in neighbours if not Cell.C[i].in_meeting)
             #Avoid infested cells.
@@ -556,9 +556,9 @@ class Event:
         self.in_progress = False
         self.completed = False
         self.conditions = conditions
-        
+
         Event.E[self.ID] = self
-        
+
     def initialize(self, minimum = 1):
         self.time_to_complete = max(random.choice(self.possibilities), minimum)
         self.in_progress = True
@@ -570,18 +570,18 @@ class Event:
 
     def check_completion(self):
         return self.state == self.time_to_complete
-    
+
     def show_state(self):
         print(self.ID, ":", self.state)
-   
+
 class Move:
     def __init__(self, actor, target, search_space, conditions):
         pass
-    
-                    
 
 
 
 
 
-   
+
+
+

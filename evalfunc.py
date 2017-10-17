@@ -1,5 +1,6 @@
-#!/usr/bin/python3.6
-#simulate.py This file contains the description of the instance of the simulation.
+#!/usr/bin/python3.5
+#evalfunc.py.
+#This file contains the program used in the 2017 eCAADe paper. It describes the partial knowledge problem.
 
 import sys
 import math
@@ -8,69 +9,65 @@ import pygame
 from colors import *
 from entities import *
 
-def run(img, s=8):
+def run(img, s=5):
     pygame.init()
     clock = pygame.time.Clock()
-    frame = 10
-
+    frame = 4
     #Setup space
     w, h = Cell.create_space_from_plan(s, img)
     Collection.generate_zones_and_thresholds()
-
-    ### Sets of zones by zone type.
-    all_zones = set(Collection.Z.keys())
-    corridor = {"13","14","15","16","3","6","22","28","34","41","51","58","65","70","71","72","73","79","84","89","47"}
-    day_room = {"50","54","57","62","64","69"}
-    nurse_station = {"21","31","33"}
-    medicine_room = {"27","32"}
-    patient_rooms = {"0","1","2","4","7","18","23","30","35","43","52","59","66","74","80","85","90"}
-    offices = {"19","20","26","37","38","39","48","49","56","63","61","76","77","78","83","87","88","44","45","46"}
-
-    #############################################################
-    #############################################################
-    #############################################################
     print("Created space consisting of ", len(Cell.C), "cells.")
-
     screen = pygame.display.set_mode((w, h))  # create screen
-    pygame.display.set_caption("IDEALIZED HOSPITAL WARD")
+    pygame.display.set_caption("THE PARTIAL KNOWLEDGE PROBLEM")
     background = pygame.image.load(img).convert()
-    target = Actor("target", x = 38, y = 7, zone = "13", color = black)
-    v = 0
-    #v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None,\
-                    #locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
-    v = make_actors(v_name = v, n = 10, actor_type = "BLUE", color = steelblue,\
-                    unavailable = set())
-    v = make_actors(v_name = v, n = 10, actor_type = "RED", color = gold,\
-                    unavailable = set())
-    setup_friends()
+    #A = Actor("A", x = 14, y = 6, zone = "0", unavailable = {"2"}, color = steelblue)
+    A = Actor("A", x = 12, y = 6, zone = "0", color = steelblue)
+
+
+    B = Actor("B", x = 42, y = 14, zone = "4", color = tomato)
     tf = 0
     g = Collection.TG
-    #infest(n=100, zones = corridor, p = 10)
-    #infest(n = 50, zones = day_room, p = 20)
-    #infest(n = 70, zones = corridor|day_room, p = -25)
-    Collection.test_assignments()
-
-
+    Collection.check_diagonal_thresholds()
+    pause = False
     while True:
         tf += 1
+        if tf == 7:
+            for c in Collection.Z["2"].threshold_cells:
+                Cell.C[c].is_occupied = True
+
+        if tf == 23:
+            for c in Collection.Z["2"].threshold_cells:
+                Cell.C[c].is_occupied = False
+
+
+        g = Collection.TG
         screen.fill(white)
-        #spawn = Spawn(name=v, color=tomato, tf=tf, start_in="70", target=target, screen=screen, interval=range(5,60), unavailable=offices|nurse_station|medicine_room|day_room, actor_type="visitor", graph=g)
-        #v = spawn.name
-        #update_infestation()
-        #conduct_searches(screen)
-        #Unplanned.check_all()
-        #Unplanned.update_all()
         Cell.draw_barriers(screen)
         Collection.draw_everything(screen)
         Actor.draw_all_actors(screen, min_size = 6)
-        manage_io_events(screen, highlight = True, report = False, possible = corridor)
+        if not pause:
+            Move(A, B, screen, unavailable = A.unavailable , graph=g)
+            pass
+        else:
+            f = pygame.font.SysFont("monospace", 16)
+            l = f.render("Paused", True, (10, 10, 10))
+            screen.blit(l, (100, 50))
+
+        label_all(screen, s)
+        pause,tf = manage_io_events(screen,tf, highlight = True, report = True, pause=pause)
         pygame.display.update()
+        #print(pause)
+
         clock.tick(frame)
 
 ################################################################################
 ################### EVENT FUNCTIONS ############################################
 ################################################################################
-def manage_io_events(screen, highlight = False, report = False, possible = None):
+
+def reset_actor(x = 14, y = 6):
+    Actor.A["A"].move((x,y))
+
+def manage_io_events(screen,tf, highlight = False, report = False, possible = None, pause = False):
     mpos = tuple([math.floor(i /Cell.size) for i in pygame.mouse.get_pos()])
     if report:
         if mpos in Cell.C.keys():
@@ -84,13 +81,22 @@ def manage_io_events(screen, highlight = False, report = False, possible = None)
             sys.exit
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                reset_actor_positions(actor_type = "BLUE", possible = possible)
-                reset_actor_positions(actor_type = "RED", possible = possible)
+                reset_actor()
+                tf = 0
+                #reset_actor_positions(actor_type = "BLUE", possible = possible)
+                #reset_actor_positions(actor_type = "RED", possible = possible)
+            if event.key == pygame.K_p:
+                if not pause:
+                    pause = True
+                else:
+                    pause = False
+    return pause,tf
+
 
 def highlight_zone(screen, mpos):
     for z in Collection.Z:
         if mpos in Collection.Z[z].cells:
-            Collection.Z[z].draw(screen, color = coral)
+            Collection.Z[z].draw(screen, color = lightgrey)
             label(screen, z)
 
 def highlight_threshold(screen, mpos):
@@ -100,9 +106,25 @@ def highlight_threshold(screen, mpos):
                 Cell.C[c].draw(screen, drawing_type = "graph", color = tomato)
 
 def label(screen, z):
-    f = pygame.font.SysFont("monospace", 12)
+    f = pygame.font.SysFont("monospace", 16)
     l = f.render(Collection.Z[z].ID, True, (10, 10, 10))
     screen.blit(l, Collection.Z[z].center)
+
+def label_all(screen, s):
+    f = pygame.font.SysFont("monospace", 20)
+    for z in Collection.Z.keys():
+        l = f.render("Z"+Collection.Z[z].ID, True, (10, 10, 10))
+        screen.blit(l, Collection.Z[z].center)
+
+    for t in Collection.T.keys():
+        posx = min([i[0] for i in list(Collection.T[t].cells)])
+        posy = min([i[1] for i in list(Collection.T[t].cells)])
+        posx = posx*s - 2*s
+        posy = posy*s - 2*s
+        l = f.render("T"+Collection.T[t].ID, True, (10, 10, 10))
+        screen.blit(l, (posx, posy))
+
+
 
 ################################################################################
 ################### SEARCH FUNCTIONS ###########################################
@@ -149,6 +171,7 @@ def reset_actor_positions(actor_type = None, possible = None):
         if actor_type in a:
             new_pos = random.choice(list(Collection.Z[random.choice(available_zones)].cells))
             Actor.A[a].move(new_pos)
+    Unplanned.Completed = set()
 
 def make_actors(v_name = None, n = None, actor_type = None, color = None, threshold = None, unavailable = set(), locations = None):
     """
@@ -158,7 +181,7 @@ def make_actors(v_name = None, n = None, actor_type = None, color = None, thresh
         v_name = 0
     if n is not None and locations is None:
         max_act = v_name + n
-        available_zones = [i for i in Collection.Z.keys() if i not in unavailable]
+        available_zones = [i for i in Collection.Z.keys() if len(Collection.Z[i].thresholds) > 0]
         while v_name < max_act:
             v_name += 1
             actor_name = str(v_name) + "_" + actor_type
@@ -225,4 +248,7 @@ def meetings():
 ################################################################################
 
 if __name__ == "__main__":
-   run("cardio_alt.png", s = 7)
+   run("bg.png", s = 15)
+
+
+

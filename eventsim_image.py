@@ -1,4 +1,4 @@
-#!/usr/bin/python3.5
+#!/usr/bin/python3.6
 
 import sys, time, math, random, heapq, pygame, numpy
 from operator import itemgetter

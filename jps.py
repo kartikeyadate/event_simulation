@@ -7,7 +7,7 @@ def draw(x, y, s, screen, color, fill = False):
     if not fill:
         pygame.draw.rect(screen, color, (x*s, y*s, s, s), 1)
     if fill:
-        pygame.draw.rect(screen, color, (x*s, y*s, s, s))    
+        pygame.draw.rect(screen, color, (x*s, y*s, s, s))
 
 def check_orthogonal_cells(start, x, y, screen, color):
     directions = (1, 0), (0, 1), (-1, 0), (0, -1)
@@ -19,8 +19,8 @@ def check_orthogonal_cells(start, x, y, screen, color):
             cy += dy
             if 0 < cx < x and 0 < cy < y:
                 draw(cx, cy, s, screen, color)
-        cx, cy = start 
-        
+        cx, cy = start
+
 def check_diagonal_cells(start, x, y, screen, color):
     directions = (1, 1), (-1, 1), (-1, -1), (1, -1)
     cx, cy = start
@@ -31,7 +31,7 @@ def check_diagonal_cells(start, x, y, screen, color):
             cy += dy
             check_orthogonal_cells((cx, cy), x, y, screen, color)
         cx, cy = start
-        
+
 pygame.init()
 w, h, s = 600, 600, 10
 clock = pygame.time.Clock()  # create a clock object

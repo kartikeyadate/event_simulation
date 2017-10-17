@@ -29,7 +29,7 @@ def run():
     p = Actor("p", x, y, s, space, cadetblue, 20)
     tg = Actor("tg", x1, y1, s, space, teal, 10)
     graph = make_threshold_graph()
-   
+
     while True:
         simulate(screen, space, Cockroach.Roaches, Actor.Actors, Cockroach.Poison, white)
 #        move(p, tg, space, screen, gold)
@@ -51,9 +51,6 @@ def make_threshold_graph():
 
 
 def make_room_array(a, b, room_size, top_left, space):
-    xs, ys = list(), list()
-    allthresholds = list()
-    alltop_lefts = list()
     x, y = top_left
     x_size, y_size = room_size
     for i in range(x, x + room_size[0] * a, room_size[0] + 1):
@@ -135,7 +132,7 @@ def make_roaches(n, r, p, c):
 def move_roaches(roaches, space):
     for r in roaches:
         r.move_cockroach(space)
-        
+
 
 
 def draw(screen, space, roaches, actors, poison, color):
@@ -418,7 +415,7 @@ class Actor:
 #####################################################################################
 
 class PriorityQueue:
-    """A wrapper class around python's heapq class. 
+    """A wrapper class around python's heapq class.
        An instance of this class
        is used to store the list of open cells."""
 
@@ -586,10 +583,10 @@ class Search:
                     self.came_from[loc] = current
         path = self.build_path()
         return path
-    
+
     def get_threshold_path(self):
         pass
-    
+
 
     def build_path(self):
         path = list()
