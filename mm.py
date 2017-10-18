@@ -12,13 +12,13 @@ def run(img = "cardio.png", s=5):
     pygame.init()
     clock = pygame.time.Clock()
     frame = 100
-    w, h = 1500,600
+    w, h = 1000,600
     s = 10
     Cell.create_space(w,h,s)
     Collection.mzt(22,18,tl=(1,1))
     zones = list(Collection.Z.keys())
     unavailable = set()
-    one = "a","b","c","d","e","f","g","h", "i", "j", "k"
+    one = "a","b","c","d","e","f","g","h"
     two = "p","q","r","s","t","u","v","w", "x", "y", "z"
     groups = one, two
     for o in one:
@@ -89,14 +89,16 @@ def label(screen, z):
     screen.blit(l, Collection.Z[z].center)
 
 def reset_actor_positions():
+    for m in Meet.M.keys():
+        Meet.M[m].kill()
     zones = set(Collection.Z.keys())
     for a in Actor.A.keys():
         u = Actor.A[a].unavailable
         z = random.choice(list(zones.difference(u)))
         cells = Collection.Z[z].cells
         newpos = random.choice(list(cells))
-        Actor.A[a].move(newpos)
         Actor.A[a].state = "idle"
+        Actor.A[a].move(newpos)
 
 def move(screen, one, two, engaged):
     """
@@ -114,25 +116,29 @@ def decisions(screen, groups, log, me):
         if Actor.A[one[i]].state != "going_to_meet":
             Move(Actor.A[one[i]], Actor.A[two[i]], screen, graph=Collection.TG, unavailable=Actor.A[one[i]].unavailable)
 
-    possibles = Actor.possible_unscheduled(one)
-    #Create possible new meetings.
-    for (z,p) in possibles:
-        print((z, tuple(p)), z,tuple(p) in log)
-        if (z,tuple(p)) not in log and str(me) not in Meet.M.keys():
-            m = Meet(str(me), current_participants = p, zone = z, duration = random.choice(range(15, 40)))
-            #print('Added meeting between ' + ', '.join(p) + ' in zone ' + z)
-            me +=1
-
-    #Update existing meetings.
-    torem = set()
     for m in Meet.M.keys():
-        if Meet.M[m].state == "not_initialized":
-            Meet.M[m].locate()
-        out = Meet.M[m].proceed(screen)
-        if out is not None:
-            log.add(out)
-    print(len(log), "meetings added.")
-    #print(me, log)
+        if Meet.M[m].state == "completed":
+            z = Meet.M[m].zone
+            p = tuple(Meet.M[m].current_participants)
+            log.add((z,p))
+            Meet.M[m].kill()
+        Meet.M[m].proceed(screen)
+
+
+    for z in Collection.Z.keys():
+        act = Collection.Z[z].actors
+        act = [i for i in act if Actor.A[i].state != "in_meet"]
+        act = set(act).intersection(set(one))
+        if len(act) >= 2:
+            act = tuple(sorted(list(act)))
+            forlog = z, act
+            if (z,act) not in log:
+                m = Meet(str(me), current_participants = list(act), zone=z, duration = random.choice(range(15,40)))
+                print('Added meeting between ' + ', '.join(act) + ' in zone ' + z)
+                m.locate()
+                m.proceed(screen)
+                me += 1
+            log.add(forlog)
 
     return log, me
 

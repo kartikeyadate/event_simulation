@@ -6,9 +6,7 @@ from operator import itemgetter
 from collections import defaultdict
 from colors import *
 
-################################################################################
 #######################CLASSES DESCRIBING SPACE: CELL, COLLECTION###############
-################################################################################
 class Cell(object):
     """
     Creates a square cell object of size s pixels at coordinate (x, y)
@@ -195,7 +193,6 @@ class Cell(object):
         x1, y1, z1 = a
         x2, y2, z2 = b
         return math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
-
 
 class Collection(object):
     """
@@ -652,9 +649,7 @@ class Collection(object):
         for t in Collection.T.keys():
             print(t, len(Collection.T[t].cells), Collection.T[t].cells)
 
-################################################################################
 #######################CLASSES DESCRIBING ACTORS: ACTOR, COCKROACHES ###########
-################################################################################
 class Actor(object):
     """
     Definition of the actor.
@@ -981,6 +976,7 @@ class Target:
         self.zone = zone
         self.personal_space = set()
         self.locations = set()
+        self.occupied_locations = set()
         self.current = None
         if self.x is not None and self.y is not None:
             self.set_personal_space()
@@ -1045,9 +1041,7 @@ class Target:
         for t in Target.T:
             Target.T[t].draw_target(screen)
 
-################################################################################
-######## CLASSES FOR SEARCH ####################################################
-################################################################################
+############################ CLASSES FOR SEARCH ################################
 class PriorityQueue:
     """
     A wrapper class around python's heapq class.
@@ -1178,7 +1172,6 @@ class Search:
         if len(draw_this) > 1:
             pygame.draw.aalines(screen, color, False, draw_this, 1)
 
-######################################################################################################
 ###################################### EVENT CLASSES #################################################
 class Spawn:
     def __init__(self, name=None, color=khaki, tf=None, start_in=None, target=None, screen=None, interval=range(5, 60), unavailable=None, actor_type=None, graph=None):
@@ -1265,14 +1258,12 @@ class Move:
         else:
             return target.x, target.y
 
-
     def check_done(self):
         if type(self.target) == Target:
             return (self.actor.x, self.actor.y) == (self.target.x, self.target.y)
         elif type(self.target) == Actor:
             tz = Cell.C[(self.target.x, self.target.y)].nbrs
             return (self.actor.x, self.actor.y) in tz
-
 
     def go(self, ignore=set()):
         if self.actor.state in ("going_to_meet", "idle", "in_move"):
@@ -1389,42 +1380,46 @@ class Meet:
         Where it is relevant, the current position of the participants (current_participants)
         is taken into account.
         """
+        if len(list(Target.T.keys())) > 0:
+            t = max(list(Target.T.keys()))
+        else:
+            t = 0
         zones = {Actor.A[i].zone for i in self.current_participants}
         if len(zones) < 1:
             print("None of the actors appear to be in a zone:", (self.ID, self.zone, self.current_participants))
             return
 
         if self.zone is None and self.target is None: #intention is for actors to meet somewhere.
-            self.target_specified = False
             if len(zones) == 1:
                 self.zone = list(zones)[0]
                 tx,ty = self.centroid()
-                self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+                t += 1
+                self.target = Target(t,x=tx,y=ty,zone=self.zone)
 
             elif len(zones) > 1: #bad input - in this case zone and target are both not specified and actors are scattered across zones.
                 print("Meeting not possible.")
                 return
 
         elif self.zone is None and self.target is not None: #intention is for actors to meet at a given location, but zone has been neglected.
-            self.target_specified = True
             self.zone = self.target.zone #simply update zone
             #it doesn't really matter where the actors currently are.
 
         elif self.zone is not None and self.target is None: #intention is for actors to meet somewhere in a given zone.
-            self.target_specified = False
             if len(zones) == 1:
                 if self.zone == list(zones)[0]: #all participants are in the intended zone.
                     tx,ty = self.centroid()
-                    self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+                    t+=1
+                    self.target = Target(t,x=tx,y=ty,zone=self.zone)
                 elif self.zone != list(zones)[0]: #all participants are in a single zone, but it is not the intended zone.
                     tx, ty = Collection.Z[self.zone].center_cell
-                    self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+                    t += 1
+                    self.target = Target(t,x=tx,y=ty,zone=self.zone)
+
             elif len(zones) > 1: #all participants are scattered in more than one zone
                 tx, ty = Collection.Z[self.zone].center_cell
-                self.target = Target("temp",x=tx,y=ty,zone=self.zone)
+                t+=1
+                self.target = Target(t,x=tx,y=ty,zone=self.zone)
 
-        elif self.zone is not None and self.target is not None:
-            self.target_specified = True
 
     def centroid(self):
         xs,ys = list(), list()
@@ -1443,10 +1438,6 @@ class Meet:
                 return None
             elif self.state == "in_progress" and self.progress == self.duration:
                 self.state = "completed"
-                z = self.zone
-                p = tuple(sorted(self.current_participants))
-                self.kill()
-                return z,p
 
     def start(self):
         for p in self.current_participants:
@@ -1472,13 +1463,13 @@ class Meet:
             if self.spatial_conditions():
                 self.start()
             else:
-
                 provide = dict()
                 for p in self.current_participants:
                     Actor.A[p].state = "going_to_meet"
-                    available_locations = [i for i in self.target.locations if not Cell.C[i].is_occupied]
+                    available_locations = {i for i in self.target.locations if not Cell.C[i].is_occupied}
                     if len(available_locations) > 0:
-                        x,y = random.choice(available_locations)
+                        x,y = random.choice(list(available_locations))
+                        available_locations.remove((x,y))
                         provide[p] = x,y
                     else:
                         print("Location is not available")

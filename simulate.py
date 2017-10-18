@@ -8,7 +8,7 @@ import pygame
 from colors import *
 from entities import *
 
-def run(img, s=8):
+def run(img, s=5):
     pygame.init()
     clock = pygame.time.Clock()
     frame = 10
@@ -36,8 +36,9 @@ def run(img, s=8):
     background = pygame.image.load(img).convert()
     target = Actor("target", x = 38, y = 7, zone = "13", color = black)
     v = 0
-    #v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None,\
-                    #locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
+
+    v = make_actors(v_name = v, actor_type = "nurse", color = green, unavailable = None,\
+                    locations = ((50,43,"21"), (55,43,"21"), (60,43,"21"), (78,43,"33"), (83,43,"33"), (88,43,"33")))
     v = make_actors(v_name = v, n = 10, actor_type = "BLUE", color = steelblue,\
                     unavailable = set())
     v = make_actors(v_name = v, n = 10, actor_type = "RED", color = gold,\
@@ -54,10 +55,10 @@ def run(img, s=8):
     while True:
         tf += 1
         screen.fill(white)
-        #spawn = Spawn(name=v, color=tomato, tf=tf, start_in="70", target=target, screen=screen, interval=range(5,60), unavailable=offices|nurse_station|medicine_room|day_room, actor_type="visitor", graph=g)
-        #v = spawn.name
-        #update_infestation()
-        #conduct_searches(screen)
+        spawn = Spawn(name=v, color=tomato, tf=tf, start_in="70", target=target, screen=screen, interval=range(5,60), unavailable=offices|nurse_station|medicine_room|day_room, actor_type="visitor", graph=g)
+        v = spawn.name
+        update_infestation()
+        conduct_searches(screen)
         #Unplanned.check_all()
         #Unplanned.update_all()
         Cell.draw_barriers(screen)

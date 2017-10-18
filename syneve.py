@@ -12,7 +12,7 @@ def run():
     pygame.init()
     clock = pygame.time.Clock()
     frame = 100
-    w, h = 1000, 600
+    w, h = 800, 600
     s = 10
     Cell.create_space(w,h,s)
     Collection.mzt(22,18,tl=(1,1))
