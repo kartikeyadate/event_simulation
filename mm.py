@@ -18,8 +18,8 @@ def run(img = "cardio.png", s=5):
     Collection.mzt(22,18,tl=(1,1))
     zones = list(Collection.Z.keys())
     unavailable = set()
-    one = "a","b","c","d","e","f","g","h"
-    two = "p","q","r","s","t","u","v","w", "x", "y", "z"
+    one = "a","b","c","d","e","f","g","h","i","j","k","l","m"
+    two = "n","o","p","q","r","s","t","u","v","w","x","y","z"
     groups = one, two
     for o in one:
         Actor(o, zone = random.choice(zones), color = tomato)
@@ -119,21 +119,22 @@ def decisions(screen, groups, log, me):
     for m in Meet.M.keys():
         if Meet.M[m].state == "completed":
             z = Meet.M[m].zone
-            p = tuple(Meet.M[m].current_participants)
+            p = tuple(Meet.M[m].participants)
             log.add((z,p))
             Meet.M[m].kill()
-        Meet.M[m].proceed(screen)
+        else:
+            Meet.M[m].proceed(screen)
 
 
     for z in Collection.Z.keys():
         act = Collection.Z[z].actors
-        act = [i for i in act if Actor.A[i].state != "in_meet"]
+        act = [i for i in act if Actor.A[i].state in ("idle", "in_move")]
         act = set(act).intersection(set(one))
         if len(act) >= 2:
             act = tuple(sorted(list(act)))
             forlog = z, act
             if (z,act) not in log:
-                m = Meet(str(me), current_participants = list(act), zone=z, duration = random.choice(range(15,40)))
+                m = Meet(str(me), participants = list(act), duration = random.choice(range(15,40)))
                 print('Added meeting between ' + ', '.join(act) + ' in zone ' + z)
                 m.locate()
                 m.proceed(screen)

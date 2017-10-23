@@ -757,8 +757,6 @@ class Actor(object):
         if len(oldzs) == 1 and len(newzs) == 1:
             old_z = list(oldzs)[0]
             new_z = list(newzs)[0]
-            if new_z != old_z:
-                print("This should not be possible unless positions are being reset!")
         #Entering a zone from a threshold
         if len(oldzs) == 2 and len(newzs) == 1:
             old_z = list(oldzs.difference(newzs))[0]
@@ -969,9 +967,9 @@ class Target:
     """Defines a target cell. Target cells are not occupied."""
     T = dict()
     def __init__(self, name, size=9, x = None, y = None, zone = None):
+        self.name = name
         self.x = x
         self.y = y
-        self.name = name
         self.size = size #1,4,9 or 16 cells - 1x1, 2x2, 3x3 or 4x4
         self.zone = zone
         self.personal_space = set()
@@ -1029,12 +1027,16 @@ class Target:
         """
         Returns whether or not a target is available.
         """
-        z = self.zone
-        actors_in_zone = Collection.Z[z].actors
-        other_actors = actors_in_zone.difference(apart_from)
+        other_actors = Collection.Z[self.zone].actors.difference(apart_from)
         locations = {(Actor.A[i].x, Actor.A[i].y) for i in other_actors}
         in_target = locations.intersection(self.locations)
         return len(in_target) == 0
+
+    def kill(self):
+        if self.name in Target.T:
+            Target.T.pop(self.name)
+        del self
+
 
     @staticmethod
     def draw_all_targets(screen):
@@ -1353,15 +1355,30 @@ class Move:
         pass
 
 class Meet:
+    """
+    Defines a meeting. Ways in which a meeting can be defined:
+        1. A set of actors meet at a given target.
+        2. A set of actors meet in a given zone.
+    A meeting has the following states:
+        1. "not_initialized"
+        2. "in_progress"
+        3. "completed"
+        4. "suspended"
+    A meeting has a specified duration given in timesteps.
+    """
     M = dict()
-    def __init__(self, ID, current_participants = list(), zone = None, target = None, space = set(), state = "not_initialized", start_at = 0, progress = 0, duration = random.choice(range(25,36))):
-        if len(current_participants) < 2:
+    def __init__(self, ID, participants = list(), zone = None, target = None, target_specified = False, space = set(), state = "not_initialized", start_at = 0, progress = 0, duration = random.choice(range(25,36))):
+        if len(participants) < 2:
             print("At least two actors are required for a meeting to occur. Less than two have been specified.")
             return
+        if target_specified and self.zone is None and self.target is None:
+            print("The location of this meeting has not been adequately given. Specify zone or target.")
+            return
         self.ID = ID
-        self.current_participants = current_participants #expected participants of a scheduled meeting, actual participants in any meeting.
+        self.participants = participants #expected participants of a scheduled meeting, actual participants in any meeting.
         self.zone = zone
         self.target = target
+        self.target_specified = target_specified
         self.state = state  #possible states: "not_initialized", "in_progress", "completed", "suspended"
         self.start_at = start_at
         self.progress = progress #timesteps towards duration.
@@ -1372,58 +1389,50 @@ class Meet:
     def locate(self):
         """
         This function locates a meeting given the information specified.
-        Possibilities covered:
-            zone and target both not specified.
-            zone specified, target not specified.
-            zone not specified target specified.
-            zone and target both specified.
-        Where it is relevant, the current position of the participants (current_participants)
+        If a target has been specified in the meeting definition, the target is assigned to the meeting.
+        Where it is relevant, the current position of the participants (participants)
         is taken into account.
+        To define a scheduled meeting, actors and at least the meeting zone or the meeting target should be provided.
+        To define an unscheduled meeting, the actors involved should be in the same zone and target_specified should be false.
         """
         if len(list(Target.T.keys())) > 0:
             t = max(list(Target.T.keys()))
         else:
             t = 0
-        zones = {Actor.A[i].zone for i in self.current_participants}
+
+        zones = {Actor.A[i].zone for i in self.participants}
         if len(zones) < 1:
-            print("None of the actors appear to be in a zone:", (self.ID, self.zone, self.current_participants))
+            print("None of the actors appear to be in a zone:", (self.ID, self.zone, self.participants))
             return
 
-        if self.zone is None and self.target is None: #intention is for actors to meet somewhere.
-            if len(zones) == 1:
-                self.zone = list(zones)[0]
-                tx,ty = self.centroid()
-                t += 1
-                self.target = Target(t,x=tx,y=ty,zone=self.zone)
-
-            elif len(zones) > 1: #bad input - in this case zone and target are both not specified and actors are scattered across zones.
-                print("Meeting not possible.")
-                return
-
-        elif self.zone is None and self.target is not None: #intention is for actors to meet at a given location, but zone has been neglected.
-            self.zone = self.target.zone #simply update zone
-            #it doesn't really matter where the actors currently are.
-
-        elif self.zone is not None and self.target is None: #intention is for actors to meet somewhere in a given zone.
-            if len(zones) == 1:
-                if self.zone == list(zones)[0]: #all participants are in the intended zone.
-                    tx,ty = self.centroid()
-                    t+=1
+        if self.target_specified:
+            if self.zone is None:
+                self.zone = self.target.zone
+            elif self.target is None:
+                if len(zones) == 1:
+                    tx, ty = self.centroid()
+                    t += 1
                     self.target = Target(t,x=tx,y=ty,zone=self.zone)
-                elif self.zone != list(zones)[0]: #all participants are in a single zone, but it is not the intended zone.
+                elif len(zones) > 1:
                     tx, ty = Collection.Z[self.zone].center_cell
                     t += 1
                     self.target = Target(t,x=tx,y=ty,zone=self.zone)
 
-            elif len(zones) > 1: #all participants are scattered in more than one zone
-                tx, ty = Collection.Z[self.zone].center_cell
-                t+=1
-                self.target = Target(t,x=tx,y=ty,zone=self.zone)
-
+        elif not self.target_specified:
+            if self.target is None:
+                if len(zones) == 1:
+                    if self.zone is None:
+                        self.zone = list(zones)[0]
+                    tx, ty = self.centroid()
+                    t += 1
+                    self.target = Target(t,x=tx,y=ty,zone=self.zone)
+                elif len(zones) > 1:
+                    print("Meeting location cannot be determined as the zone in which meeting is to occur cannot be identified.")
+                    return
 
     def centroid(self):
         xs,ys = list(), list()
-        for p in self.current_participants:
+        for p in self.participants:
             px,py = Actor.A[p].x, Actor.A[p].y
             xs.append(px)
             ys.append(py)
@@ -1440,33 +1449,38 @@ class Meet:
                 self.state = "completed"
 
     def start(self):
-        for p in self.current_participants:
+        for p in self.participants:
             self.space = self.space.union(Actor.A[p].personal_space)
             Actor.A[p].state = "in_meet"
         self.state = "in_progress"
         self.progress += 1
 
     def spatial_conditions(self):
-        if len(self.current_participants) <= 1:
+        if len(self.participants) <= 1:
             return False
         else:
             satisfied = True
-            for p in self.current_participants:
+            if self.target is None:
+                return False
+            for p in self.participants:
                 if not (satisfied and (Actor.A[p].x, Actor.A[p].y) in self.target.locations):
                     return False
             return satisfied
 
     def proceed(self,screen):
-        if len(self.current_participants) < 2:
+        if len(self.participants) < 2:
             return False
         if self.state == "not_initialized":
             if self.spatial_conditions():
                 self.start()
             else:
                 provide = dict()
-                for p in self.current_participants:
+                for p in self.participants:
                     Actor.A[p].state = "going_to_meet"
-                    available_locations = {i for i in self.target.locations if not Cell.C[i].is_occupied}
+                    if self.target is not None:
+                        available_locations = {i for i in self.target.locations if not Cell.C[i].is_occupied}
+                    else:
+                        available_locations = set()
                     if len(available_locations) > 0:
                         x,y = random.choice(list(available_locations))
                         available_locations.remove((x,y))
@@ -1482,18 +1496,20 @@ class Meet:
             self.update()
 
     def kill(self):
-        self.current_participants = list(self.current_participants)
-        while self.current_participants:
-            p = self.current_participants.pop()
+        self.participants = list(self.participants)
+        while self.participants:
+            p = self.participants.pop()
             Actor.A[p].state = "idle"
             Actor.A[p].event = None
+        if self.target is not None:
+            self.target.kill()
         del self
 
     def add_participant(self, p, screen):
         Actor.A[p].state = "going_to_meet"
         Move(Actor.A[p],self.target,screen,graph=Collection.TG,unavailable=Actor.A[p].unavailable)
         if (Actor.A[p].x, Actor.A[p].y) in self.target.locations:
-            self.current_participants.add(p)
+            self.participants.add(p)
             Actor.A[p].state = "in_meet"
 
 class Event:
@@ -1523,6 +1539,8 @@ class Event:
         for s in self.steps:
             for a in s.actors:
                 print(Actor.A[a].state)
+
+#The Step class holds either a meet or a move event.
 
 class Step:
     S = dict()
@@ -1577,28 +1595,31 @@ class Step:
         return result
 
     def proceed(self, screen):
-        if self.tests():
-            if self.state == "not_initialized" and self.progress == 0:
-                self.start()
-            elif self.state == "in_progress":
-                self.update()
-        else:
-            if not self.me:
-                if len(Meet.M) > 0:
-                    me = [int(i) for i in Meet.M.keys() if i.isdigit()]
-                    if len(me) > 0:
-                        me = max(me)
+        if len(self.actors) > 1:
+            if self.tests():
+                if self.state == "not_initialized" and self.progress == 0:
+                    self.start()
+                elif self.state == "in_progress":
+                    self.update()
+            else:
+                if not self.me and not self.mo and len(self.actors) > 1:
+                    if len(Meet.M) > 0:
+                        me = [int(i) for i in Meet.M.keys() if i.isdigit()]
+                        if len(me) > 0:
+                            me = max(me)
+                        else:
+                            me = 0
                     else:
                         me = 0
+                    me += 1
+                    self.me = Meet(str(me), participants = self.actors, zone = self.target.zone, target = self.target, duration = 1)
+                    self.me.proceed(screen)
                 else:
-                    me = 0
-                me += 1
-                self.me = Meet(str(me), current_participants = self.actors, zone = self.target.zone, target = self.target, duration = 1)
-                self.me.proceed(screen)
-            else:
-                self.me.proceed(screen)
-            if self.me.state == "in_progress":
-                for a in self.actors:
-                    if Actor.A[a].event is None:
-                        Actor.A[a].event = self.event
+                    self.me.proceed(screen)
+                if self.me.state == "in_progress":
+                    for a in self.actors:
+                        if Actor.A[a].event is None:
+                            Actor.A[a].event = self.event
+        elif len(self.actors) == 1:
+            pass
 

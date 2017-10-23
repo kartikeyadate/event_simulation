@@ -135,11 +135,11 @@ def execute(screen, group,uns,log):
     for (zone, actors) in possible:
         c += 1
         uns = "uns_" + str(c)
-        Meet(uns, current_participants = list(actors), zone = zone, duration = random.choice(range(10,30)))
+        Meet(uns, participants = list(actors), zone = zone, duration = random.choice(range(10,30)))
 
     for m in Meet.M.keys():
         if "uns_" in m and Meet.M[m].state == "completed":
-            ma = Meet.M[m].current_participants
+            ma = Meet.M[m].participants
             mz = Meet.M[m].zone
             log.add((mz,tuple(sorted(ma))))
             Meet.M[m].kill()
