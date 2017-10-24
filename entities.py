@@ -1595,7 +1595,7 @@ class Step:
         return result
 
     def proceed(self, screen):
-        if len(self.actors) > 1:
+        if len(self.actors) > 1: #the step is a meet step
             if self.tests():
                 if self.state == "not_initialized" and self.progress == 0:
                     self.start()
@@ -1614,12 +1614,53 @@ class Step:
                     me += 1
                     self.me = Meet(str(me), participants = self.actors, zone = self.target.zone, target = self.target, duration = 1)
                     self.me.proceed(screen)
+                    self.mo = None
                 else:
                     self.me.proceed(screen)
+                    self.mo = None
                 if self.me.state == "in_progress":
                     for a in self.actors:
                         if Actor.A[a].event is None:
                             Actor.A[a].event = self.event
         elif len(self.actors) == 1:
-            pass
+            if self.mo is None:
+                act = Actor.A[list(self.actors)[0]]
+                tar = self.target
+                self.mo = act, tar
+                Move(act, tar, screen,graph=Collection.TG, unavailable = act.unavailable)
+                self.me = None
+            else:
+                act, tar = self.mo
+                Move(act, tar, screen, graph=Collection.TG, unavailable = act.unavailable)
+                self.me = None
+
+    def remove_actor(self, a):
+        self.actors.discard(a)
+        Actor.A[a].event = None
+        #### Update properties here.
+
+    def add_actor(self, a):
+        self.actors.add(a)
+        Actor.A[a].event = self.event
+        ##### Update properties here.
+
+    def update_destination(self, dest):
+        dx,dy = dest
+        dz = Cell.C[dest].zones
+        if len(dz) == 1:
+            dz = list(dz)[0]
+        elif len(dz) > 1 and self.zone in dz:
+            dz = self.zone
+        ##### account for these exhaustively.
+
+
+
+
+
+
+
+
+
+
+
 
