@@ -757,12 +757,13 @@ class Actor(object):
         if len(oldzs) == 1 and len(newzs) == 1:
             old_z = list(oldzs)[0]
             new_z = list(newzs)[0]
+
         #Entering a zone from a threshold
         if len(oldzs) == 2 and len(newzs) == 1:
             old_z = list(oldzs.difference(newzs))[0]
             new_z = list(newzs)[0]
 
-        #Conitnuing in a threshold
+        #Continuing in a threshold
         if len(oldzs) == 2 and len(newzs) == 2:
             inter = newzs.intersection(oldzs)
             new_z = list(inter)[0]
@@ -784,6 +785,7 @@ class Actor(object):
                 Collection.Z[self.zone].actors.add(self.name)
                 if self.name in Collection.Z[self.prev_zone].actors:
                     Collection.Z[self.prev_zone].actors.remove(self.name)
+
             # update the threshold's information about the actors in it.
             if new_t != old_t:
                 self.threshold = new_t
@@ -1652,15 +1654,5 @@ class Step:
         elif len(dz) > 1 and self.zone in dz:
             dz = self.zone
         ##### account for these exhaustively.
-
-
-
-
-
-
-
-
-
-
 
 
